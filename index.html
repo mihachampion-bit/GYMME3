@@ -233,8 +233,31 @@
       padding:10px;
       display:flex; flex-direction:column; gap:10px;
     }
-    .title{ font-weight:950; }
 
+    /* ====== HIERARCHY (left) ====== */
+    .blockHeader{
+      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+      cursor:pointer;
+      user-select:none;
+    }
+    .blockTitle{
+      font-weight:1000;
+      font-size:18px;
+      letter-spacing:.2px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .chev{
+      width:22px; height:22px; border-radius:8px;
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--border);
+      background: color-mix(in oklab, var(--panel2), var(--panel) 35%);
+      color:var(--muted);
+      font-weight:1000;
+      flex:0 0 auto;
+    }
+    .blockCollapsed .chev{ transform: rotate(-90deg); }
+
+    .exList{ margin-left:18px; display:flex; flex-direction:column; gap:10px; }
     .exItem{
       display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
       padding:8px 10px;
@@ -244,7 +267,7 @@
     }
     .exLeft{ min-width:0; flex:1; }
     .exName{
-      font-weight:900;
+      font-weight:500; /* НЕ жирный */
       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .exMeta{ display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
@@ -277,7 +300,7 @@
     .wChip.hidden{ opacity:.45; text-decoration: line-through; }
     .wChip button{
       border:0; background:transparent; cursor:pointer;
-      color:var(--muted); font-weight:900; padding:0 2px;
+      color:var(--muted); font-weight:1000; padding:0 2px;
     }
 
     /* Center: table */
@@ -340,6 +363,23 @@
       user-select:none;
     }
     .th.workout{ cursor:pointer; }
+
+    /* delete workout button */
+    .wHead{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:8px; width:100%;
+    }
+    .wDel{
+      border:1px solid var(--border);
+      background:transparent;
+      border-radius:10px;
+      padding:4px 7px;
+      cursor:pointer;
+      color:var(--muted);
+      font-weight:950;
+      opacity:.75;
+    }
+    .wDel:hover{ opacity:1; }
+
     .th.workout.selected{
       outline:2px solid color-mix(in oklab, var(--accent), transparent 60%);
       outline-offset:-2px;
@@ -357,12 +397,27 @@
     .path .l1{ font-weight:950; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .path .l2{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
+    /* ====== HIERARCHY (table) ====== */
     .blockSep{
       background: color-mix(in oklab, var(--panel), var(--panel2) 40%);
-      font-weight:950;
+      font-weight:1000;
+      cursor:pointer;
+      user-select:none;
     }
-    .exerciseSep{
-      background: color-mix(in oklab, var(--panel2), var(--panel) 14%);
+    .blockSep .l1{ font-size:16px; }
+    .exerciseHead{
+      background: color-mix(in oklab, var(--panel2), var(--panel) 10%);
+    }
+    .exerciseHead .l1{
+      font-weight:600; /* не жирный */
+      font-size:14px;
+    }
+    .weightRow .l1{
+      font-weight:900;
+      font-family:var(--mono);
+    }
+    .weightIndent{
+      padding-left:18px;
     }
 
     .td{ cursor:pointer; }
@@ -607,7 +662,7 @@
               </div>
               <div class="field">
                 <span class="mini">Подсказка:</span>
-                <span class="mini">клик по ячейке → редактор сетов • 🩹 травма</span>
+                <span class="mini">клик по ячейке → редактор сетов • 🩹 травма • 🗑 удалить тренировку</span>
               </div>
             </div>
 
@@ -746,20 +801,10 @@
 <script>
 /* ==========================================================
    Gym Progress Tracker — Single-file offline app
-   - IndexedDB (preferred) with LocalStorage fallback
-   - Blocks → Exercises → Weights (hide/unhide)
-   - Exercise option: Left/Right mode (two subrows)
-   - Workouts columns with manual dates (duplicates allowed)
-   - Cells: multiple sets, quick parse, injury mark+comment
-   - Auto colors:
-     Yellow = first ever entry for exercise (no PR that time)
-     Green  = first time that weight used in that exercise
-     Gold   = new best-set PR on this weight (per side) (persistent)
-     Gray   = normal
-     Red    = injury (overrides display; gold state still tracked)
-   - Goals: placeholder “надо X” = current record + 1, per weight/side; empty if no record
-   - Stats per workout: counts + sets per block
-   - Analytics: 4 charts + short insights
+   v2.1 (patch):
+   - Collapsible blocks (left + table) with persisted state
+   - Clear hierarchy: Block → Exercise → Weight (no repeated exercise label per weight row)
+   - Delete workouts (🗑 in column header), removes its entries
    ========================================================== */
 </script>
 <script>
@@ -796,11 +841,8 @@ function fmtMonthKey(k){ // YYYY-MM -> MM.YYYY
 }
 
 function parseSetsQuick(str){
-  // Accept: "12+10+8", "12,10,8", "12 10 8", lines
   if(!str) return [];
-  return String(str)
-    .trim()
-    .split(/[\s,+\n\r]+/)
+  return String(str).trim().split(/[\s,+\n\r]+/)
     .map(x => parseInt(x,10))
     .filter(n => Number.isFinite(n) && n>=0);
 }
@@ -808,7 +850,6 @@ function bestSet(sets){ return sets.length ? Math.max(...sets) : 0; }
 function sumSets(sets){ return sets.reduce((a,b)=>a+b,0); }
 
 function safeNumWeight(w){
-  // store as string but parse for calculations
   const n = Number(String(w).replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
 }
@@ -824,8 +865,8 @@ function dlJSON(obj, name){
 </script>
 <script>
 /* ====== Storage: IndexedDB with fallback ====== */
-const STORE_KEY = "gym_tracker_singlefile_v2";
-let storageMode = "idb"; // or "ls"
+const STORE_KEY = "gym_tracker_singlefile_v2_1";
+let storageMode = "idb";
 let idb = null;
 
 function idbOpen(){
@@ -868,12 +909,8 @@ function idbDel(db, key){
   });
 }
 async function storageInit(){
-  try{
-    idb = await idbOpen();
-    storageMode = "idb";
-  }catch{
-    storageMode = "ls";
-  }
+  try{ idb = await idbOpen(); storageMode = "idb"; }
+  catch{ storageMode = "ls"; }
 }
 async function storageLoad(){
   if(storageMode==="idb"){
@@ -886,18 +923,13 @@ async function storageLoad(){
 }
 let saveTimer=null;
 async function storageSave(obj){
-  // debounced
   if(saveTimer) clearTimeout(saveTimer);
   return new Promise((resolve)=>{
     saveTimer = setTimeout(async ()=>{
       try{
-        if(storageMode==="idb"){
-          await idbSet(idb, STORE_KEY, obj);
-        }else{
-          localStorage.setItem(STORE_KEY, JSON.stringify(obj));
-        }
+        if(storageMode==="idb") await idbSet(idb, STORE_KEY, obj);
+        else localStorage.setItem(STORE_KEY, JSON.stringify(obj));
       }catch(e){
-        // fallback to localStorage if IDB fails mid-flight
         try{
           localStorage.setItem(STORE_KEY, JSON.stringify(obj));
           storageMode="ls";
@@ -908,11 +940,8 @@ async function storageSave(obj){
   });
 }
 async function storageReset(){
-  if(storageMode==="idb"){
-    await idbDel(idb, STORE_KEY);
-  }else{
-    localStorage.removeItem(STORE_KEY);
-  }
+  if(storageMode==="idb") await idbDel(idb, STORE_KEY);
+  else localStorage.removeItem(STORE_KEY);
 }
 </script>
 <script>
@@ -926,7 +955,7 @@ function seed(){
     {id:uid("b"), name:"НОГИ", order:4, archived:false},
   ];
   return {
-    version: 2,
+    version: 21,
     ui:{
       theme:"light",
       showHiddenWeights:false,
@@ -936,21 +965,13 @@ function seed(){
       analyticsPeriod:"month",
       analyticsExerciseId:null,
       drawerOpen:false,
+      collapsedBlocks: {} // blockId -> true/false
     },
     blocks: b,
-    exercises: [
-      // Example seed can be removed:
-      // {id:uid("e"), blockId:b[0].id, name:"Жим лёжа", order:0, archived:false, lr:false},
-    ],
-    weights: {
-      // exerciseId: [{id, value:"60", hidden:false}, ...]
-    },
-    workouts: [
-      // {id, date:"03.01.2026", createdAt}
-    ],
-    entries: {
-      // key: `${workoutId}|${exerciseId}|${weightId}|${side}` -> { sets:[12,10,8], comment:"", injury:false, injuryComment:"", gold:false, createdAt, updatedAt }
-    }
+    exercises: [],
+    weights: {},
+    workouts: [],
+    entries: {}
   };
 }
 
@@ -965,6 +986,7 @@ function normalize(s){
   s.ui.analyticsPeriod = s.ui.analyticsPeriod || "month";
   s.ui.analyticsExerciseId = s.ui.analyticsExerciseId || null;
   s.ui.drawerOpen = !!s.ui.drawerOpen;
+  if(!s.ui.collapsedBlocks || typeof s.ui.collapsedBlocks!=="object") s.ui.collapsedBlocks = {};
 
   if(!Array.isArray(s.blocks)) s.blocks=[];
   if(!Array.isArray(s.exercises)) s.exercises=[];
@@ -975,6 +997,7 @@ function normalize(s){
   s.blocks.forEach((b,i)=>{
     if(typeof b.order!=="number") b.order=i;
     if(b.archived==null) b.archived=false;
+    if(s.ui.collapsedBlocks[b.id]==null) s.ui.collapsedBlocks[b.id] = false;
   });
   s.exercises.forEach((e,i)=>{
     if(typeof e.order!=="number") e.order=i;
@@ -982,11 +1005,9 @@ function normalize(s){
     if(e.lr==null) e.lr=false;
   });
 
-  // workouts: newest left (unshift), allow duplicates; keep current order by createdAt desc if missing
   s.workouts.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(s.workouts.length && !s.ui.selectedWorkoutId) s.ui.selectedWorkoutId = s.workouts[0].id;
 
-  // weights per exercise
   for(const exId of Object.keys(s.weights)){
     if(!Array.isArray(s.weights[exId])) s.weights[exId]=[];
     s.weights[exId].forEach((w,i)=>{
@@ -998,7 +1019,6 @@ function normalize(s){
     s.weights[exId].sort((a,b)=>(a.order||0)-(b.order||0));
   }
 
-  // entries shape
   for(const k of Object.keys(s.entries)){
     const v = s.entries[k];
     if(!v || typeof v!=="object"){ delete s.entries[k]; continue; }
@@ -1007,7 +1027,7 @@ function normalize(s){
     if(typeof v.comment!=="string") v.comment = v.comment ? String(v.comment) : "";
     v.injury = !!v.injury;
     if(typeof v.injuryComment!=="string") v.injuryComment = v.injuryComment ? String(v.injuryComment) : "";
-    v.gold = !!v.gold; // persistent gold marker
+    v.gold = !!v.gold;
     v.createdAt = v.createdAt || Date.now();
     v.updatedAt = v.updatedAt || Date.now();
   }
@@ -1033,7 +1053,7 @@ function weightsVisible(exId){
   return arr.filter(w=>!w.hidden);
 }
 function workoutWindowed(){
-  const w = state.workouts.slice(); // already newest first
+  const w = state.workouts.slice();
   const win = state.ui.window;
   if(win==="all") return w;
   const n = parseInt(win,10);
@@ -1042,6 +1062,13 @@ function workoutWindowed(){
 }
 function entryKey(workoutId, exId, weightId, side){ return `${workoutId}|${exId}|${weightId}|${side}`; }
 function sidesForExercise(ex){ return ex.lr ? ["L","R"] : ["-"]; }
+function isBlockCollapsed(blockId){ return !!state.ui.collapsedBlocks[blockId]; }
+
+function toggleBlockCollapse(blockId){
+  state.ui.collapsedBlocks[blockId] = !state.ui.collapsedBlocks[blockId];
+  storageSave(state);
+  renderAll();
+}
 
 function setTheme(theme){
   state.ui.theme = theme;
@@ -1057,7 +1084,9 @@ function addBlock(){
   const name = prompt("Название блока (например: ТРИЦЕПС)");
   if(!name) return;
   const maxOrder = Math.max(-1, ...state.blocks.map(b=>b.order||0));
-  state.blocks.push({id:uid("b"), name:name.trim(), order:maxOrder+1, archived:false});
+  const b = {id:uid("b"), name:name.trim(), order:maxOrder+1, archived:false};
+  state.blocks.push(b);
+  state.ui.collapsedBlocks[b.id] = false;
   storageSave(state); renderAll();
 }
 function renameBlock(blockId){
@@ -1071,7 +1100,6 @@ function archiveBlock(blockId){
   const b = getBlock(blockId); if(!b) return;
   if(!confirm(`Архивировать блок “${b.name}”? (мягко, данные останутся)`)) return;
   b.archived = true;
-  // archive exercises in this block
   state.exercises.forEach(e=>{ if(e.blockId===blockId) e.archived=true; });
   storageSave(state); renderAll();
 }
@@ -1084,9 +1112,7 @@ function addExercise(blockId){
   const ex = {id:uid("e"), blockId, name:name.trim(), order:maxOrder+1, archived:false, lr:false};
   state.exercises.push(ex);
   if(!state.weights[ex.id]) state.weights[ex.id]=[];
-  // no default weights: user said only what they add
   storageSave(state); renderAll();
-  // update analytics select default
   if(!state.ui.analyticsExerciseId) state.ui.analyticsExerciseId = ex.id;
 }
 function renameExercise(exId){
@@ -1141,7 +1167,6 @@ function renameWeight(exId, weightId){
 function addWorkout(){
   const date = prompt("Дата тренировки (ДД.ММ.ГГГГ). Дубликаты разрешены.");
   if(!date) return;
-  // strict manual input: we don't validate hard; but parse if possible for analytics
   const t = { id: uid("t"), date: date.trim(), createdAt: Date.now() };
   state.workouts.unshift(t);
   state.ui.selectedWorkoutId = t.id;
@@ -1152,6 +1177,25 @@ function selectWorkout(id){
   storageSave(state);
   $$(".th.workout").forEach(x=>x.classList.toggle("selected", x.dataset.workoutId===id));
   renderRightStats();
+}
+function deleteWorkout(workoutId){
+  const w = state.workouts.find(x=>x.id===workoutId);
+  if(!w) return;
+  if(!confirm(`Удалить тренировку ${w.date}?\n(Удалятся и все ячейки этой тренировки)`)) return;
+
+  // remove entries belonging to this workout
+  for(const k of Object.keys(state.entries)){
+    if(k.startsWith(workoutId + "|")) delete state.entries[k];
+  }
+  // remove workout
+  state.workouts = state.workouts.filter(x=>x.id!==workoutId);
+
+  // update selection
+  if(state.ui.selectedWorkoutId === workoutId){
+    state.ui.selectedWorkoutId = state.workouts[0]?.id || null;
+  }
+  storageSave(state);
+  renderAll();
 }
 
 /* ====== Entry classification helpers ====== */
@@ -1172,10 +1216,7 @@ function delEntry(workoutId, exId, weightId, side){
   delete state.entries[k];
 }
 
-/* First time exercise done? (before this workout) */
 function hasAnyEntryForExerciseBefore(exId, workoutId){
-  // "first ever exercise" is global across all workouts and weights and sides
-  // before current workout: we treat earlier createdAt workouts as "before"
   const cur = state.workouts.find(w=>w.id===workoutId);
   const curTs = cur ? (cur.createdAt||0) : Number.MAX_SAFE_INTEGER;
   for(const k of Object.keys(state.entries)){
@@ -1190,8 +1231,6 @@ function hasAnyEntryForExerciseBefore(exId, workoutId){
   }
   return false;
 }
-
-/* First time weight used in exercise? (before this workout) */
 function hasAnyEntryForWeightBefore(exId, weightId, workoutId){
   const cur = state.workouts.find(w=>w.id===workoutId);
   const curTs = cur ? (cur.createdAt||0) : Number.MAX_SAFE_INTEGER;
@@ -1207,8 +1246,6 @@ function hasAnyEntryForWeightBefore(exId, weightId, workoutId){
   }
   return false;
 }
-
-/* Current best record for ex+weight+side (before this workout) using best set as record definition */
 function bestRecordBefore(exId, weightId, side, workoutId){
   const cur = state.workouts.find(w=>w.id===workoutId);
   const curTs = cur ? (cur.createdAt||0) : Number.MAX_SAFE_INTEGER;
@@ -1228,49 +1265,37 @@ function bestRecordBefore(exId, weightId, side, workoutId){
   }
   return best;
 }
-
-/* classify cell for a given entry (for rendering) */
 function classifyCell(workoutId, exId, weightId, side){
   const ent = getEntry(workoutId, exId, weightId, side);
   if(!ent || !(ent.sets||[]).length){
-    // empty cell: goal placeholder may exist
     return { color:"gray", gold:false, green:false, yellow:false, injury:false };
   }
   const injury = !!ent.injury;
 
-  // yellow: first time exercise ever (no comparison, and no record that time)
   const hadExerciseBefore = hasAnyEntryForExerciseBefore(exId, workoutId);
   const yellow = !hadExerciseBefore;
 
-  // green: first time weight used in exercise (regardless of side) before this workout
   const hadWeightBefore = hasAnyEntryForWeightBefore(exId, weightId, workoutId);
-  const green = hadExerciseBefore && !hadWeightBefore; // if first exercise -> yellow wins conceptually
+  const green = hadExerciseBefore && !hadWeightBefore;
 
-  // gold: new best set vs prior record, BUT per your rule:
-  // - no record when first time doing exercise (yellow)
-  // - gold is persistent: once ent.gold true, stay gold
   let gold = !!ent.gold;
   if(!gold && hadExerciseBefore){
     const b = bestSet(ent.sets||[]);
     const prevBest = bestRecordBefore(exId, weightId, side, workoutId);
     if(b > prevBest && b > 0){
       gold = true;
-      // persist: mark this entry as gold forever
       ent.gold = true;
       ent.updatedAt = Date.now();
     }
   }
 
-  // injury overrides display color, but gold state persists
   if(injury) return { color:"injury", gold, green, yellow, injury:true };
   if(yellow) return { color:"yellow", gold:false, green:false, yellow:true, injury:false };
   if(gold) return { color:"gold", gold:true, green:false, yellow:false, injury:false };
   if(green) return { color:"green", gold:false, green:true, yellow:false, injury:false };
   return { color:"gray", gold:false, green:false, yellow:false, injury:false };
 }
-
 function goalForCell(exId, weightId, side){
-  // goal = current record + 1; if no record => empty
   let best = 0;
   for(const k of Object.keys(state.entries)){
     if(exIdFromKey(k)!==exId) continue;
@@ -1296,6 +1321,7 @@ function renderLeft(container){
       <div><b>2)</b> В упражнении добавь нужные веса (какие хочешь).</div>
       <div><b>3)</b> Добавь тренировку (дата вручную).</div>
       <div><b>4)</b> Клик по ячейке → введи подходы. 🩹 — травма.</div>
+      <div><b>5)</b> Клик по названию блока — свернуть/развернуть.</div>
     </div>
     <div style="height:10px"></div>
     <div class="row">
@@ -1308,18 +1334,25 @@ function renderLeft(container){
 
   for(const b of blocks){
     const exs = exercisesByBlock(b.id);
+    const collapsed = isBlockCollapsed(b.id);
+
     html.push(`
-      <div class="block" data-block-id="${escapeAttr(b.id)}">
-        <div class="row">
-          <div class="title">${escapeHtml(b.name)}</div>
+      <div class="block ${collapsed ? "blockCollapsed":""}" data-block-id="${escapeAttr(b.id)}">
+        <div class="blockHeader" data-act="toggleBlock" title="Клик: свернуть/развернуть">
+          <div class="blockTitle">
+            <span class="chev">▾</span>
+            <span>${escapeHtml(b.name)}</span>
+          </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn small" data-act="addExercise">+ Упражнение</button>
+            <button class="btn small" data-act="addExercise" title="Добавить упражнение">+ Упражнение</button>
             <button class="btn small" data-act="renameBlock" title="Переименовать">✎</button>
             <button class="btn small" data-act="archiveBlock" title="Архивировать">⤓</button>
           </div>
         </div>
-        <div class="mini">Упражнения</div>
-        <div class="list" data-ex-list>
+
+        <div class="mini" style="margin-top:-2px;">Упражнения</div>
+
+        <div class="exList" data-ex-list style="${collapsed ? "display:none":""}">
     `);
 
     if(!exs.length){
@@ -1335,14 +1368,13 @@ function renderLeft(container){
             <div class="exLeft">
               <div class="exName" title="${escapeAttr(ex.name)}">${escapeHtml(ex.name)}</div>
               <div class="exMeta">
-                <span class="tag">блок: ${escapeHtml(b.name)}</span>
                 <span class="tag">LR: ${ex.lr ? "вкл" : "выкл"}</span>
                 <span class="tag">весов: ${wsVis.length}${state.ui.showHiddenWeights ? "" : (hiddenCount?` (+${hiddenCount} скрыто)`:"")}</span>
               </div>
 
               <div class="weightsBox">
                 <div class="row" style="margin-bottom:6px;">
-                  <div class="mini">Веса (только те, что ты добавил)</div>
+                  <div class="mini">Веса</div>
                   <button class="btn small" data-act="addWeight">+ вес</button>
                 </div>
                 <div class="weightsRow">
@@ -1378,7 +1410,7 @@ function renderLeft(container){
       }
     }
 
-    html.push(`</div></div></div>`);
+    html.push(`</div></div>`);
   }
 
   html.push(`</div>`);
@@ -1387,13 +1419,22 @@ function renderLeft(container){
   $("#btnAddBlock2", container).addEventListener("click", addBlock);
 
   const struct = $("#structure", container);
+
+  // clicks
   struct.addEventListener("click", (ev)=>{
     const btn = ev.target.closest("button");
     const act = btn?.dataset?.act;
+
     const blockEl = ev.target.closest("[data-block-id]");
     const exEl = ev.target.closest("[data-ex-id]");
     const blockId = blockEl?.dataset?.blockId;
     const exId = exEl?.dataset?.exId;
+
+    // toggle collapse when click on header (but not on buttons)
+    const header = ev.target.closest('[data-act="toggleBlock"]');
+    if(header && !btn && blockId){
+      return toggleBlockCollapse(blockId);
+    }
 
     if(act==="addExercise" && blockId) return addExercise(blockId);
     if(act==="renameBlock" && blockId) return renameBlock(blockId);
@@ -1422,24 +1463,26 @@ function renderLeft(container){
   });
 }
 
-/* ====== Rendering: table ====== */
+/* ====== Rendering: table (Block → Exercise → Weight) ====== */
 function flattenRows(){
-  // rows: block separator + per exercise: per weight (+ per side)
   const rows = [];
   for(const b of blocksActive()){
     rows.push({type:"block", blockId:b.id, title:b.name});
+    if(isBlockCollapsed(b.id)) continue;
+
     for(const ex of exercisesByBlock(b.id)){
+      rows.push({type:"exerciseHead", blockId:b.id, exId:ex.id, exName:ex.name, lr:!!ex.lr});
+
       const ws = weightsVisible(ex.id);
       if(!ws.length){
-        // still show exercise line with "(добавь вес)"
-        rows.push({type:"exerciseNoWeight", blockId:b.id, exId:ex.id, exName:ex.name, title:ex.name});
+        rows.push({type:"exerciseNoWeight", blockId:b.id, exId:ex.id});
         continue;
       }
       for(const w of ws){
         const sides = sidesForExercise(ex);
         for(const side of sides){
           rows.push({
-            type:"cellRow",
+            type:"weightRow",
             blockId:b.id,
             exId:ex.id,
             exName:ex.name,
@@ -1463,32 +1506,47 @@ function renderTable(){
 
   const frag = document.createDocumentFragment();
 
-  // header
+  // header corner
   const corner = document.createElement("div");
   corner.className = "th corner";
   corner.textContent = "Блок / Упражнение / Вес";
   frag.appendChild(corner);
 
+  // workout headers
   for(const t of workouts){
     const th = document.createElement("div");
     th.className = "th workout";
     th.dataset.workoutId = t.id;
-    th.innerHTML = `<div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-weight:950;">${escapeHtml(t.date)}</div>
-      <div class="mini" style="font-family:var(--mono);">#${escapeHtml(t.id.slice(0,6))}</div>
-    </div>`;
+
+    th.innerHTML = `
+      <div class="wHead">
+        <div style="display:flex; flex-direction:column; line-height:1.1;">
+          <div style="font-weight:950;">${escapeHtml(t.date)}</div>
+          <div class="mini" style="font-family:var(--mono);">#${escapeHtml(t.id.slice(0,6))}</div>
+        </div>
+        <button class="wDel" title="Удалить тренировку" data-act="delW">🗑</button>
+      </div>
+    `;
     if(state.ui.selectedWorkoutId===t.id) th.classList.add("selected");
     frag.appendChild(th);
   }
 
-  // body
+  // body rows
   for(const r of rows){
     const rh = document.createElement("div");
     rh.className = "rowhead";
+
     if(r.type==="block"){
       rh.classList.add("blockSep");
-      rh.innerHTML = `<div class="path"><div class="l1">${escapeHtml(r.title)}</div></div>`;
+      rh.dataset.blockId = r.blockId;
+      rh.innerHTML = `
+        <div class="path">
+          <div class="l1">${escapeHtml(r.title)}</div>
+          <div class="l2">клик: свернуть/развернуть</div>
+        </div>
+      `;
       frag.appendChild(rh);
+
       for(let i=0;i<workouts.length;i++){
         const td = document.createElement("div");
         td.className = "td";
@@ -1500,15 +1558,19 @@ function renderTable(){
       continue;
     }
 
-    if(r.type==="exerciseNoWeight"){
+    if(r.type==="exerciseHead"){
       const bName = getBlock(r.blockId)?.name || "";
-      rh.classList.add("exerciseSep");
-      rh.innerHTML = `<div class="path">
-        <div class="l1">${escapeHtml(r.exName)}</div>
-        <div class="l2">${escapeHtml(bName)} • добавь вес в левом меню</div>
-      </div>`;
+      rh.classList.add("exerciseHead");
+      rh.dataset.exId = r.exId;
+      rh.innerHTML = `
+        <div class="path">
+          <div class="l1 weightIndent">${escapeHtml(r.exName)}</div>
+          <div class="l2 weightIndent">${escapeHtml(bName)} • LR: ${r.lr ? "вкл" : "выкл"}</div>
+        </div>
+      `;
       frag.appendChild(rh);
-      for(const t of workouts){
+
+      for(let i=0;i<workouts.length;i++){
         const td = document.createElement("div");
         td.className = "td";
         td.tabIndex = -1;
@@ -1518,14 +1580,37 @@ function renderTable(){
       continue;
     }
 
-    // cellRow
-    const bName = getBlock(r.blockId)?.name || "";
-    const sideLabel = (r.side==="-" ? "" : ` • ${r.side==="L"?"Left":"Right"}`);
-    rh.classList.add("exerciseSep");
-    rh.innerHTML = `<div class="path">
-      <div class="l1">${escapeHtml(r.exName)} — <span style="font-family:var(--mono);">${escapeHtml(r.weightValue)}</span>${escapeHtml(sideLabel)}</div>
-      <div class="l2">${escapeHtml(bName)}</div>
-    </div>`;
+    if(r.type==="exerciseNoWeight"){
+      rh.classList.add("exerciseHead");
+      const ex = getExercise(r.exId);
+      const bName = ex ? (getBlock(ex.blockId)?.name||"") : "";
+      rh.innerHTML = `
+        <div class="path">
+          <div class="l1 weightIndent">${escapeHtml(ex?.name || "Упражнение")}</div>
+          <div class="l2 weightIndent">${escapeHtml(bName)} • добавь вес слева</div>
+        </div>
+      `;
+      frag.appendChild(rh);
+
+      for(let i=0;i<workouts.length;i++){
+        const td = document.createElement("div");
+        td.className = "td";
+        td.tabIndex = -1;
+        td.innerHTML = `<div class="cell"><div class="val" style="color:var(--muted);">—</div></div>`;
+        frag.appendChild(td);
+      }
+      continue;
+    }
+
+    // weightRow
+    rh.classList.add("weightRow");
+    const sideLabel = (r.side==="-" ? "" : (r.side==="L" ? "Left" : "Right"));
+    rh.innerHTML = `
+      <div class="path">
+        <div class="l1 weightIndent">${escapeHtml(r.weightValue)}${sideLabel ? ` • ${escapeHtml(sideLabel)}` : ""}</div>
+        <div class="l2 weightIndent">вес</div>
+      </div>
+    `;
     frag.appendChild(rh);
 
     for(const t of workouts){
@@ -1545,9 +1630,24 @@ function renderTable(){
   grid.innerHTML = "";
   grid.appendChild(frag);
 
-  // header click select workout
+  // bind header events (select + delete)
   $$(".th.workout").forEach(th=>{
-    th.addEventListener("click", ()=> selectWorkout(th.dataset.workoutId));
+    th.addEventListener("click", (ev)=>{
+      const del = ev.target.closest('[data-act="delW"]');
+      if(del){
+        ev.stopPropagation();
+        deleteWorkout(th.dataset.workoutId);
+        return;
+      }
+      selectWorkout(th.dataset.workoutId);
+    });
+  });
+
+  // bind block collapse in table (click on block rowhead)
+  $$(".rowhead.blockSep").forEach(rh=>{
+    rh.addEventListener("click", ()=>{
+      toggleBlockCollapse(rh.dataset.blockId);
+    });
   });
 }
 
@@ -1561,14 +1661,11 @@ function renderCellInto(td, workoutId, exId, weightId, side){
   const goal = (!sets.length) ? goalForCell(exId, weightId, side) : "";
   const goalTxt = goal ? `надо ${goal}` : "";
 
-  const injury = !!ent?.injury;
-  const injIcon = injury ? "🩹" : "🩹";
-
   td.innerHTML = `
     <div class="cell">
       <div class="val">${escapeHtml(val || "")}</div>
       <div class="goal">${escapeHtml(goalTxt)}</div>
-      <button class="injBtn" title="Травма" data-act="inj">${injIcon}</button>
+      <button class="injBtn" title="Травма" data-act="inj">🩹</button>
     </div>
   `;
 }
@@ -1581,10 +1678,9 @@ function renderRightStats(){
   const w = state.workouts.find(x=>x.id===wId);
 
   let gold=0, green=0, yellow=0, injury=0;
-  const setsPerBlock = new Map(); // blockId -> sets count
+  const setsPerBlock = new Map();
 
   if(w){
-    // Iterate all entries for this workout
     for(const k of Object.keys(state.entries)){
       if(workoutIdFromKey(k)!==wId) continue;
       const ent = state.entries[k];
@@ -1600,7 +1696,6 @@ function renderRightStats(){
       else if(cls.gold) gold++;
       else if(cls.green) green++;
 
-      // sets count per block
       const ex = getExercise(exId);
       if(ex){
         const bid = ex.blockId;
@@ -1650,7 +1745,7 @@ function renderRightStats(){
 }
 
 /* ====== Modal editor ====== */
-let modalCtx = null; // {workoutId, exId, weightId, side}
+let modalCtx = null;
 
 function openModal(ctx){
   modalCtx = ctx;
@@ -1662,7 +1757,6 @@ function openModal(ctx){
   $("#mTitle").textContent = `${ex ? ex.name : "?"} — ${ww}${sideLabel?` • ${sideLabel}`:""}`;
   $("#mSubtitle").textContent = `${w ? w.date : "?"}`;
 
-  // side tabs
   const tabs = $("#mSideTabs");
   tabs.innerHTML = "";
   const sides = sidesForExercise(ex || {lr:false});
@@ -1672,7 +1766,6 @@ function openModal(ctx){
     b.textContent = (s==="-" ? "—" : (s==="L"?"Left":"Right"));
     b.addEventListener("click", ()=>{
       modalCtx.side = s;
-      // re-open same modal with new side (keep content)
       openModal(modalCtx);
     });
     tabs.appendChild(b);
@@ -1681,22 +1774,15 @@ function openModal(ctx){
   $("#mWeight").textContent = ww;
   const ent = getEntry(ctx.workoutId, ctx.exId, ctx.weightId, ctx.side);
 
-  // fill sets inputs
   renderModalSets(ent?.sets || []);
-
-  // quick input
   $("#mQuick").value = "";
-
-  // comments
   $("#mComment").value = ent?.comment || "";
   $("#mInjuryComment").value = ent?.injuryComment || "";
-
-  // injury state
   $("#mInjuryState").textContent = ent?.injury ? "Отмечено как травма (красный приоритет)" : "Нет травмы";
 
-  // computed labels
   const cls = classifyCell(ctx.workoutId, ctx.exId, ctx.weightId, ctx.side);
-  $("#mGoal").textContent = goalForCell(ctx.exId, ctx.weightId, ctx.side) ? `надо ${goalForCell(ctx.exId, ctx.weightId, ctx.side)}` : "—";
+  const g = goalForCell(ctx.exId, ctx.weightId, ctx.side);
+  $("#mGoal").textContent = g ? `надо ${g}` : "—";
   $("#mColor").textContent = cls.color + (cls.gold ? " (gold-state)" : "");
   const sets = ent?.sets || [];
   $("#mBest").textContent = sets.length ? String(bestSet(sets)) : "—";
@@ -1716,16 +1802,12 @@ function renderModalSets(sets){
   const arr = (sets && sets.length) ? sets.slice() : [];
   if(!arr.length) arr.push(0);
 
-  arr.forEach((v, idx)=>{
+  arr.forEach((v)=>{
     const inp = document.createElement("input");
     inp.type="number";
     inp.min="0";
     inp.value = String(v||0);
-    inp.placeholder = `set ${idx+1}`;
-    inp.addEventListener("input", ()=>{
-      // live update computed fields
-      updateModalComputed();
-    });
+    inp.addEventListener("input", ()=> updateModalComputed());
     box.appendChild(inp);
   });
 }
@@ -1734,7 +1816,6 @@ function getModalSetsFromInputs(){
   const inputs = $$("#mSets input");
   return inputs.map(i=>parseInt(i.value||"0",10)).filter(n=>Number.isFinite(n)&&n>=0);
 }
-
 function updateModalComputed(){
   if(!modalCtx) return;
   const sets = getModalSetsFromInputs();
@@ -1754,38 +1835,33 @@ function toggleModalInjury(){
   base.injury = !base.injury;
   base.updatedAt = now;
 
-  if(!ent && !base.sets.length && !base.injury) {
-    // nothing to save
-    return;
-  }
+  if(!ent && !base.sets.length && !base.injury) return;
+
   setEntry(modalCtx.workoutId, modalCtx.exId, modalCtx.weightId, modalCtx.side, base);
   storageSave(state);
-  // refresh cell
+
   const td = findCellTD(modalCtx);
   if(td) renderCellInto(td, modalCtx.workoutId, modalCtx.exId, modalCtx.weightId, modalCtx.side);
   renderRightStats();
   refreshAnalytics();
-  openModal(modalCtx); // re-render modal state
+  openModal(modalCtx);
 }
 
 function saveModal(){
   if(!modalCtx) return;
   const setsRaw = getModalSetsFromInputs();
-  const sets = setsRaw.filter(n=>n>0); // zero means empty
+  const sets = setsRaw.filter(n=>n>0);
   const comment = ($("#mComment").value||"").trim();
   const injuryComment = ($("#mInjuryComment").value||"").trim();
   const now = Date.now();
 
   let ent = getEntry(modalCtx.workoutId, modalCtx.exId, modalCtx.weightId, modalCtx.side);
-  if(!ent){
-    ent = { sets:[], comment:"", injury:false, injuryComment:"", gold:false, createdAt:now, updatedAt:now };
-  }
+  if(!ent) ent = { sets:[], comment:"", injury:false, injuryComment:"", gold:false, createdAt:now, updatedAt:now };
   ent.sets = sets;
   ent.comment = comment;
   ent.injuryComment = injuryComment;
   ent.updatedAt = now;
 
-  // if empty and no injury and no comments => remove
   if(!ent.sets.length && !ent.injury && !ent.comment && !ent.injuryComment){
     delEntry(modalCtx.workoutId, modalCtx.exId, modalCtx.weightId, modalCtx.side);
   }else{
@@ -1820,40 +1896,33 @@ function findCellTD(ctx){
 }
 </script>
 <script>
-/* ====== Analytics ====== */
+/* ====== Analytics (без изменений логики) ====== */
 function getExerciseOptions(){
   const exs = exercisesActive();
   return exs.map(e=>({id:e.id, label:`${(getBlock(e.blockId)?.name||"?")} • ${e.name}`}));
 }
 
 function entriesForPeriod(period){
-  // period over workouts by date parsing (strict DD.MM.YYYY if possible)
   const workouts = state.workouts.slice();
   const parsed = workouts
     .map(w=>({w, d: parseDateDDMMYYYY(w.date)}))
     .filter(x=>x.d);
-  if(!parsed.length) return { workouts:[], entries:[] };
 
-  // sort by actual date ascending for analytics
+  if(!parsed.length) return { workouts:[], entries:[] };
   parsed.sort((a,b)=>a.d-b.d);
 
   let end = parsed[parsed.length-1].d;
   let start = new Date(end.getTime());
-  const ONE_DAY = 24*3600*1000;
 
-  if(period==="month"){
-    start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
-  }else if(period==="3m"){
-    start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth()-2, 1));
-  }else if(period==="year"){
-    start = new Date(Date.UTC(end.getUTCFullYear(), 0, 1));
-  }else{
-    start = parsed[0].d;
-  }
+  if(period==="month") start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  else if(period==="3m") start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth()-2, 1));
+  else if(period==="year") start = new Date(Date.UTC(end.getUTCFullYear(), 0, 1));
+  else start = parsed[0].d;
+
   const startTs = start.getTime();
-
   const wsIn = parsed.filter(x=>x.d.getTime()>=startTs).map(x=>x.w);
   const wsSet = new Set(wsIn.map(w=>w.id));
+
   const ents = [];
   for(const k of Object.keys(state.entries)){
     const wId = workoutIdFromKey(k);
@@ -1866,7 +1935,6 @@ function entriesForPeriod(period){
 
 function sumMetricForWorkouts(workouts, metric){
   const wsSet = new Set(workouts.map(w=>w.id));
-  const byBlock = new Map(); // blockId -> value
   let total = 0;
 
   for(const k of Object.keys(state.entries)){
@@ -1878,10 +1946,6 @@ function sumMetricForWorkouts(workouts, metric){
     const exId = exIdFromKey(k);
     const weightId = weightIdFromKey(k);
     const side = sideFromKey(k);
-    const ex = getExercise(exId);
-    if(!ex) continue;
-    const blockId = ex.blockId;
-
     const weightObj = (getWeights(exId).find(x=>x.id===weightId) || null);
     const wVal = weightObj ? safeNumWeight(weightObj.value) : NaN;
 
@@ -1892,23 +1956,19 @@ function sumMetricForWorkouts(workouts, metric){
       const cls = classifyCell(wId, exId, weightId, side);
       add = cls.gold ? 1 : 0;
     }else{
-      // volume
       const reps = sumSets(ent.sets||[]);
       add = (Number.isFinite(wVal) ? (wVal * reps) : 0);
     }
-
     total += add;
-    byBlock.set(blockId, (byBlock.get(blockId)||0) + add);
   }
-  return { total, byBlock };
+  return { total };
 }
 
 function periodPrev(period, start, end){
-  // previous same-size period: month/3m/year/all
   if(period==="all") return null;
   const e = end;
   if(period==="month"){
-    const prevEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), 0)); // last day prev month
+    const prevEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), 0));
     const prevStart = new Date(Date.UTC(prevEnd.getUTCFullYear(), prevEnd.getUTCMonth(), 1));
     return {start:prevStart, end:prevEnd};
   }
@@ -1940,15 +2000,16 @@ function workoutsBetweenDates(start, end){
 
 function drawLineChart(canvas, labels, series, title){
   const ctx = canvas.getContext("2d");
-  const w = canvas.width = canvas.clientWidth * (window.devicePixelRatio||1);
-  const h = canvas.height = canvas.clientHeight * (window.devicePixelRatio||1);
+  const dpr = (window.devicePixelRatio||1);
+  const w = canvas.width = canvas.clientWidth * dpr;
+  const h = canvas.height = canvas.clientHeight * dpr;
   ctx.clearRect(0,0,w,h);
 
-  const pad = 34 * (window.devicePixelRatio||1);
+  const pad = 34 * dpr;
   const plotW = w - pad*2;
   const plotH = h - pad*2;
 
-  ctx.font = `${12*(window.devicePixelRatio||1)}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.font = `${12*dpr}px ${getComputedStyle(document.body).fontFamily}`;
   ctx.fillStyle = getComputedStyle(document.body).color;
   ctx.globalAlpha = 0.9;
   ctx.fillText(title, pad, pad*0.75);
@@ -1956,7 +2017,7 @@ function drawLineChart(canvas, labels, series, title){
 
   if(!series.length){
     ctx.globalAlpha = .6;
-    ctx.fillText("Нет данных", pad, pad + 24*(window.devicePixelRatio||1));
+    ctx.fillText("Нет данных", pad, pad + 24*dpr);
     ctx.globalAlpha = 1;
     return;
   }
@@ -1965,10 +2026,9 @@ function drawLineChart(canvas, labels, series, title){
   const minV = Math.min(0, ...series);
   const range = maxV - minV || 1;
 
-  // axes
   ctx.globalAlpha = .25;
   ctx.strokeStyle = getComputedStyle(document.body).color;
-  ctx.lineWidth = 1*(window.devicePixelRatio||1);
+  ctx.lineWidth = 1*dpr;
   ctx.beginPath();
   ctx.moveTo(pad, pad);
   ctx.lineTo(pad, pad+plotH);
@@ -1976,9 +2036,8 @@ function drawLineChart(canvas, labels, series, title){
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // line
   ctx.strokeStyle = getComputedStyle(document.body).color;
-  ctx.lineWidth = 2*(window.devicePixelRatio||1);
+  ctx.lineWidth = 2*dpr;
   ctx.beginPath();
   series.forEach((v,i)=>{
     const x = pad + (plotW * (series.length===1 ? 0 : i/(series.length-1)));
@@ -1987,27 +2046,24 @@ function drawLineChart(canvas, labels, series, title){
   });
   ctx.stroke();
 
-  // points
   ctx.fillStyle = getComputedStyle(document.body).color;
   series.forEach((v,i)=>{
     const x = pad + (plotW * (series.length===1 ? 0 : i/(series.length-1)));
     const y = pad + plotH - ((v - minV)/range)*plotH;
-    ctx.beginPath(); ctx.arc(x,y,3*(window.devicePixelRatio||1),0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,3*dpr,0,Math.PI*2); ctx.fill();
   });
 
-  // x labels (few)
   ctx.globalAlpha = .6;
-  ctx.font = `${10*(window.devicePixelRatio||1)}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.font = `${10*dpr}px ${getComputedStyle(document.body).fontFamily}`;
   const step = Math.ceil(labels.length/5) || 1;
   for(let i=0;i<labels.length;i+=step){
     const x = pad + (plotW * (labels.length===1 ? 0 : i/(labels.length-1)));
-    ctx.fillText(labels[i], x-12*(window.devicePixelRatio||1), pad+plotH+18*(window.devicePixelRatio||1));
+    ctx.fillText(labels[i], x-12*dpr, pad+plotH+18*dpr);
   }
   ctx.globalAlpha = 1;
 }
 
 function buildMonthlySeries(metric){
-  // Build per-month total metric series over available parsed dates
   const items = state.workouts
     .map(w=>({w, d: parseDateDDMMYYYY(w.date)}))
     .filter(x=>x.d)
@@ -2015,7 +2071,7 @@ function buildMonthlySeries(metric){
 
   if(!items.length) return {labels:[], values:[]};
 
-  const map = new Map(); // monthKey -> workouts[]
+  const map = new Map();
   for(const it of items){
     const mk = monthKeyUTC(it.d);
     if(!map.has(mk)) map.set(mk, []);
@@ -2033,8 +2089,6 @@ function buildMonthlySeries(metric){
 }
 
 function exerciseTrendSeries(exId){
-  // For selected exercise: best set per workout for each weight+side? user asked "график по повторам тех или иных упражнений и весов"
-  // We'll choose: best set across all weights for that exercise per workout (or per chosen weight if exists)
   const items = state.workouts
     .map(w=>({w, d: parseDateDDMMYYYY(w.date)}))
     .filter(x=>x.d)
@@ -2062,7 +2116,6 @@ function injuryWeightInsight(period){
   const {workouts, entries} = entriesForPeriod(period);
   if(!workouts.length) return {text:"Нет данных.", ratio:null};
 
-  // collect injuries with numeric weights and non-injuries too
   const injuredWeights = [];
   const allWeights = [];
   for(const {k, ent} of entries){
@@ -2081,6 +2134,7 @@ function injuryWeightInsight(period){
   const median = allWeights[Math.floor(allWeights.length/2)];
   const highInj = injuredWeights.filter(x=>x>=median).length;
   const ratio = highInj / injuredWeights.length;
+
   let text = `Травмы чаще на весах ≥ медианы (${median}).`;
   if(ratio >= 0.7) text = `Похоже, травмы чаще на больших весах (≥ медианы ${median}). Будь осторожнее с прогрессией.`;
   else if(ratio <= 0.3) text = `Травмы чаще на меньших весах (< медианы ${median}). Возможно, проблема в технике/разминке/усталости.`;
@@ -2088,7 +2142,6 @@ function injuryWeightInsight(period){
 }
 
 function refreshAnalytics(){
-  // fill exercise selector
   const opt = getExerciseOptions();
   const sel = $("#selExerciseTrend");
   sel.innerHTML = opt.map(o=>`<option value="${escapeAttr(o.id)}">${escapeHtml(o.label)}</option>`).join("");
@@ -2102,24 +2155,19 @@ function refreshAnalytics(){
   const metric = state.ui.analyticsMetric;
   const period = state.ui.analyticsPeriod;
 
-  // monthly series chart 1: volume/reps/prs
   const ms = buildMonthlySeries(metric==="volume"?"volume":(metric==="reps"?"reps":"prs"));
   drawLineChart($("#cVolume"), ms.labels, ms.values, metric==="volume"?"Объём по месяцам":"Метрика по месяцам");
 
-  // chart 2: PRs per month always
   const prs = buildMonthlySeries("prs");
   drawLineChart($("#cPRs"), prs.labels, prs.values, "Рекорды (gold) по месяцам");
 
-  // chart 3: exercise trend best set
   const exId = state.ui.analyticsExerciseId;
   const tr = exId ? exerciseTrendSeries(exId) : {labels:[], values:[]};
   const exName = exId ? (getExercise(exId)?.name || "Упражнение") : "Упражнение";
   drawLineChart($("#cExercise"), tr.labels, tr.values, `Тренд: лучший сет (${exName})`);
 
-  // chart 4: injuries count per month
   const injLabels = prs.labels;
   const injValues = injLabels.map(lab=>{
-    // reverse map: we don't keep mk -> workouts, so compute again via monthKey
     let c=0;
     for(const k of Object.keys(state.entries)){
       const wId = workoutIdFromKey(k);
@@ -2135,7 +2183,6 @@ function refreshAnalytics(){
   });
   drawLineChart($("#cInjury"), injLabels, injValues, "Травмы по месяцам");
 
-  // Insights: compare period vs previous
   const cur = entriesForPeriod(period);
   let note1 = "Нет данных.";
   let note2 = "Нет данных.";
@@ -2146,9 +2193,8 @@ function refreshAnalytics(){
       const prevWs = workoutsBetweenDates(prev.start, prev.end);
       const prevSum = sumMetricForWorkouts(prevWs, metric).total;
       const pct = prevSum>0 ? ((curSum-prevSum)/prevSum*100) : null;
-      if(pct==null){
-        note1 = `В выбранный период: ${Math.round(curSum)}. Для сравнения нет прошлого периода (или он пуст).`;
-      }else{
+      if(pct==null) note1 = `В выбранный период: ${Math.round(curSum)}. Для сравнения нет прошлого периода (или он пуст).`;
+      else{
         const sign = pct>=0 ? "+" : "";
         note1 = `В выбранный период: ${Math.round(curSum)}. Это ${sign}${pct.toFixed(1)}% относительно предыдущего периода.`;
       }
@@ -2156,9 +2202,8 @@ function refreshAnalytics(){
       note1 = `За всё время: ${Math.round(curSum)} (метрика: ${metric}).`;
     }
 
-    // PR note
     const curPR = sumMetricForWorkouts(cur.workouts, "prs").total;
-    note2 = `Рекордов (gold) в выбранный период: ${curPR}. (Напоминаю: рекорд = лучший подход > прошлого на этом весе и стороне; первый раз упражнение — не рекорд.)`;
+    note2 = `Рекордов (gold) в выбранный период: ${curPR}. (Рекорд = лучший подход > прошлого на этом весе и стороне; первый раз упражнение — не рекорд.)`;
   }
 
   $("#noteVolume").innerHTML = `<b>Вывод:</b> ${escapeHtml(note1)}`;
@@ -2226,9 +2271,7 @@ function applyUIFromState(){
 
 function renderAll(){
   renderLeft($("#leftInner"));
-  // mirror left into drawer
   $("#drawerInner").innerHTML = $("#leftInner").innerHTML;
-  // re-wire drawer inner by rendering again into it (so events bind)
   renderLeft($("#drawerInner"));
 
   renderTable();
@@ -2237,8 +2280,6 @@ function renderAll(){
 
 function wire(){
   $("#btnAddWorkout").addEventListener("click", addWorkout);
-  $("#btnAddBlock2")?.addEventListener("click", addBlock);
-
   $("#swTheme").addEventListener("click", ()=> setTheme(state.ui.theme==="dark"?"light":"dark"));
   $("#swTheme").addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("#swTheme").click(); } });
 
@@ -2262,7 +2303,6 @@ function wire(){
     renderAll();
   });
 
-  // Tabs
   $("#tabTable").addEventListener("click", ()=> setView("table"));
   $("#tabAnalytics").addEventListener("click", ()=> setView("analytics"));
 
@@ -2303,7 +2343,6 @@ function wire(){
     if(!workoutId || !exId || !weightId || !side) return;
 
     if(inj){
-      // quick toggle injury without opening modal
       const ent = getEntry(workoutId, exId, weightId, side);
       const now = Date.now();
       const base = ent || { sets:[], comment:"", injury:false, injuryComment:"", gold:false, createdAt:now, updatedAt:now };
@@ -2320,7 +2359,6 @@ function wire(){
     openModal({workoutId, exId, weightId, side});
   });
 
-  // Keyboard: Enter on td opens modal
   $("#grid").addEventListener("keydown", (ev)=>{
     const td = ev.target.closest(".td");
     if(!td) return;
@@ -2336,7 +2374,6 @@ function wire(){
     }
   });
 
-  // Modal buttons
   $("#mClose").addEventListener("click", closeModal);
   $("#modalBack").addEventListener("click", (e)=>{ if(e.target.id==="modalBack") closeModal(); });
   $("#mAddSet").addEventListener("click", ()=>{
@@ -2351,7 +2388,6 @@ function wire(){
   $("#mToggleInjury").addEventListener("click", toggleModalInjury);
 
   window.addEventListener("resize", ()=>{
-    // redraw analytics on resize
     if($("#viewAnalytics").classList.contains("open")) refreshAnalytics();
   });
 }
@@ -2367,13 +2403,11 @@ function wire(){
   wire();
   renderAll();
 
-  // restore drawer state
   if(state.ui.drawerOpen){
     $("#drawer").classList.add("open");
     $("#drawerBackdrop").classList.add("open");
   }
 
-  // default view
   setView("table");
 })();
 </script>
