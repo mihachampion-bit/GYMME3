@@ -15,10 +15,14 @@
       --border:#e5e7eb;
       --accent:#2563eb;
       --accent2:#0ea5e9;
-      --gold:#f5c542;
-      --green:#22c55e;
-      --yellow:#fbbf24;
-      --injury:#ef4444;
+
+      /* Более различимые статусы */
+      --gold:#f59e0b;          /* насыщенный янтарный (PR) */
+      --yellow:#fde047;        /* яркий лимонный (новое упражнение) */
+      --green:#22c55e;         /* новый вес */
+      --injury:#ef4444;        /* травма */
+      --injuryPink:#fb7185;    /* травма + рекорд (розовый) */
+
       --gray:#e5e7eb;
       --shadow: 0 12px 30px rgba(0,0,0,.07);
       --radius:14px;
@@ -267,7 +271,7 @@
     }
     .exLeft{ min-width:0; flex:1; }
     .exName{
-      font-weight:500; /* НЕ жирный */
+      font-weight:900; /* УПРАЖНЕНИЕ выше → жирным */
       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .exMeta{ display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
@@ -281,12 +285,20 @@
 
     .weightsBox{
       margin-top:8px;
+
+      /* ВЕСА ниже уровнем → делаем “вложенность” заметнее */
+      margin-left:18px; /* смещение вправо */
       border:1px solid var(--border);
       border-radius:12px;
       padding:8px;
       background: color-mix(in oklab, var(--panel2), var(--panel) 10%);
     }
-    .weightsRow{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .weightsRow{
+      display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+
+      /* чипы веса визуально уезжают вправо */
+      justify-content:flex-end;
+    }
     .wChip{
       display:inline-flex; align-items:center; gap:6px;
       border:1px solid var(--border);
@@ -295,6 +307,8 @@
       border-radius:999px;
       font-family:var(--mono);
       font-size:12px;
+
+      font-weight:500; /* ВЕСА НЕ жирные */
       user-select:none;
     }
     .wChip.hidden{ opacity:.45; text-decoration: line-through; }
@@ -409,16 +423,17 @@
       background: color-mix(in oklab, var(--panel2), var(--panel) 10%);
     }
     .exerciseHead .l1{
-      font-weight:600; /* не жирный */
+      font-weight:900; /* упражнение выше → жирнее */
       font-size:14px;
     }
     .weightRow .l1{
-      font-weight:900;
+      font-weight:500; /* вес ниже → НЕ жирный */
       font-family:var(--mono);
+      opacity:.95;
     }
-    .weightIndent{
-      padding-left:18px;
-    }
+
+    .exerciseIndent{ padding-left:18px; }
+    .weightIndent{ padding-left:42px; } /* веса глубже → заметно правее */
 
     .td{ cursor:pointer; }
     .td:focus{ outline:2px solid color-mix(in oklab, var(--accent2), transparent 55%); outline-offset:-2px; }
@@ -456,14 +471,37 @@
     }
     .td:hover .injBtn{ opacity:1; }
 
-    /* Cell colors */
-    .td[data-color="gold"]{ background: color-mix(in oklab, var(--gold), var(--panel2) 84%); }
-    .td[data-color="green"]{ background: color-mix(in oklab, var(--green), var(--panel2) 88%); }
-    .td[data-color="yellow"]{ background: color-mix(in oklab, var(--yellow), var(--panel2) 88%); }
-    .td[data-color="gray"]{ background: var(--panel2); }
+    /* Cell colors
+       Идея: вместо “бледной заливки” делаем читаемо через:
+       - лёгкий фон (почти белый/панельный)
+       - жирную цветную обводку (inset box-shadow)
+    */
+    .td[data-color="gray"]{
+      background: var(--panel2);
+    }
+    .td[data-color="gold"]{
+      background: color-mix(in oklab, var(--panel2), var(--gold) 10%);
+      box-shadow: inset 0 0 0 3px color-mix(in oklab, var(--gold), transparent 25%);
+    }
+    .td[data-color="yellow"]{
+      background: color-mix(in oklab, var(--panel2), var(--yellow) 10%);
+      box-shadow: inset 0 0 0 3px color-mix(in oklab, var(--yellow), transparent 25%);
+    }
+    .td[data-color="green"]{
+      background: color-mix(in oklab, var(--panel2), var(--green) 10%);
+      box-shadow: inset 0 0 0 3px color-mix(in oklab, var(--green), transparent 30%);
+    }
+    /* Травма: красная заливка */
     .td[data-color="injury"]{
-      background: color-mix(in oklab, var(--injury), var(--panel2) 84%);
-      box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--injury), transparent 55%);
+      background: color-mix(in oklab, var(--injury), var(--panel2) 82%);
+      box-shadow: inset 0 0 0 3px color-mix(in oklab, var(--injury), transparent 35%);
+    }
+    /* Травма + рекорд: розовая заливка */
+    .td[data-color="injuryGold"]{
+      background: color-mix(in oklab, var(--injuryPink), var(--panel2) 78%);
+      box-shadow:
+        inset 0 0 0 3px color-mix(in oklab, var(--injuryPink), transparent 30%),
+        inset 0 0 0 6px color-mix(in oklab, var(--gold), transparent 45%);
     }
 
     /* Modal */
@@ -805,8 +843,14 @@
    - Collapsible blocks (left + table) with persisted state
    - Clear hierarchy: Block → Exercise → Weight (no repeated exercise label per weight row)
    - Delete workouts (🗑 in column header), removes its entries
+
+   v2.1.1 (UI patch):
+   - Stronger visual hierarchy: Exercise bold, weights shifted right + not bold
+   - More distinct colors (gold vs yellow), prefer strong outline for readability
+   - Injury+PR shown as pink fill (injuryGold)
    ========================================================== */
 </script>
+
 <script>
 /* ====== Utilities ====== */
 const $ = (sel, root=document) => root.querySelector(sel);
@@ -863,6 +907,7 @@ function dlJSON(obj, name){
   URL.revokeObjectURL(url);
 }
 </script>
+
 <script>
 /* ====== Storage: IndexedDB with fallback ====== */
 const STORE_KEY = "gym_tracker_singlefile_v2_1";
@@ -944,6 +989,7 @@ async function storageReset(){
   else localStorage.removeItem(STORE_KEY);
 }
 </script>
+
 <script>
 /* ====== State schema ====== */
 function seed(){
@@ -1036,6 +1082,7 @@ function normalize(s){
 
 let state = null;
 </script>
+
 <script>
 /* ====== Selectors over state ====== */
 function blocksActive(){ return state.blocks.filter(b=>!b.archived).slice().sort((a,b)=>a.order-b.order); }
@@ -1309,6 +1356,7 @@ function goalForCell(exId, weightId, side){
   return String(best + 1);
 }
 </script>
+
 <script>
 /* ====== Rendering: left panel (structure) ====== */
 function renderLeft(container){
@@ -1564,8 +1612,8 @@ function renderTable(){
       rh.dataset.exId = r.exId;
       rh.innerHTML = `
         <div class="path">
-          <div class="l1 weightIndent">${escapeHtml(r.exName)}</div>
-          <div class="l2 weightIndent">${escapeHtml(bName)} • LR: ${r.lr ? "вкл" : "выкл"}</div>
+          <div class="l1 exerciseIndent">${escapeHtml(r.exName)}</div>
+          <div class="l2 exerciseIndent">${escapeHtml(bName)} • LR: ${r.lr ? "вкл" : "выкл"}</div>
         </div>
       `;
       frag.appendChild(rh);
@@ -1586,8 +1634,8 @@ function renderTable(){
       const bName = ex ? (getBlock(ex.blockId)?.name||"") : "";
       rh.innerHTML = `
         <div class="path">
-          <div class="l1 weightIndent">${escapeHtml(ex?.name || "Упражнение")}</div>
-          <div class="l2 weightIndent">${escapeHtml(bName)} • добавь вес слева</div>
+          <div class="l1 exerciseIndent">${escapeHtml(ex?.name || "Упражнение")}</div>
+          <div class="l2 exerciseIndent">${escapeHtml(bName)} • добавь вес слева</div>
         </div>
       `;
       frag.appendChild(rh);
@@ -1655,7 +1703,9 @@ function renderCellInto(td, workoutId, exId, weightId, side){
   const ent = getEntry(workoutId, exId, weightId, side);
   const sets = ent?.sets || [];
   const cls = classifyCell(workoutId, exId, weightId, side);
-  td.dataset.color = cls.color;
+
+  // injury+gold => отдельный визуальный статус (розовый)
+  td.dataset.color = (cls.injury && cls.gold) ? "injuryGold" : cls.color;
 
   const val = sets.length ? sets.join("+") : "";
   const goal = (!sets.length) ? goalForCell(exId, weightId, side) : "";
@@ -1670,6 +1720,7 @@ function renderCellInto(td, workoutId, exId, weightId, side){
   `;
 }
 </script>
+
 <script>
 /* ====== Right stats (per selected workout) ====== */
 function renderRightStats(){
@@ -1727,7 +1778,7 @@ function renderRightStats(){
         <div class="stat"><div class="n">${gold}</div><div class="k">Рекорды (gold)</div></div>
         <div class="stat"><div class="n">${green}</div><div class="k">Новые веса (green)</div></div>
         <div class="stat"><div class="n">${yellow}</div><div class="k">Новые упражнения (yellow)</div></div>
-        <div class="stat"><div class="n">${injury}</div><div class="k">Травмы (red)</div></div>
+        <div class="stat"><div class="n">${injury}</div><div class="k">Травмы (red / pink)</div></div>
       </div>
 
       <div style="height:10px"></div>
@@ -1738,7 +1789,7 @@ function renderRightStats(){
       <div class="mini">
         <b>Правила:</b> жёлтый — первый раз упражнение; зелёный — первый раз этот вес;
         золото — новый рекорд по лучшему подходу на этом весе (по стороне), и остаётся золотым навсегда;
-        травма красит ячейку в красный даже если это рекорд.
+        травма красит ячейку (если это ещё и рекорд — будет розовая “травма+рекорд”).
       </div>
     </div>
   `;
@@ -1778,12 +1829,14 @@ function openModal(ctx){
   $("#mQuick").value = "";
   $("#mComment").value = ent?.comment || "";
   $("#mInjuryComment").value = ent?.injuryComment || "";
-  $("#mInjuryState").textContent = ent?.injury ? "Отмечено как травма (красный приоритет)" : "Нет травмы";
+  $("#mInjuryState").textContent = ent?.injury ? "Отмечено как травма" : "Нет травмы";
 
   const cls = classifyCell(ctx.workoutId, ctx.exId, ctx.weightId, ctx.side);
+  const displayColor = (cls.injury && cls.gold) ? "injuryGold" : cls.color;
+
   const g = goalForCell(ctx.exId, ctx.weightId, ctx.side);
   $("#mGoal").textContent = g ? `надо ${g}` : "—";
-  $("#mColor").textContent = cls.color + (cls.gold ? " (gold-state)" : "");
+  $("#mColor").textContent = displayColor + (cls.gold ? " (gold-state)" : "");
   const sets = ent?.sets || [];
   $("#mBest").textContent = sets.length ? String(bestSet(sets)) : "—";
   $("#mSum").textContent = sets.length ? String(sumSets(sets)) : "—";
@@ -1895,6 +1948,7 @@ function findCellTD(ctx){
   return $(`.td[data-workout-id="${CSS.escape(ctx.workoutId)}"][data-ex-id="${CSS.escape(ctx.exId)}"][data-weight-id="${CSS.escape(ctx.weightId)}"][data-side="${CSS.escape(ctx.side)}"]`);
 }
 </script>
+
 <script>
 /* ====== Analytics (без изменений логики) ====== */
 function getExerciseOptions(){
