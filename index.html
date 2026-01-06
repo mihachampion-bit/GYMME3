@@ -201,6 +201,22 @@
     }
     /* /FIX */
 
+    /* FIX: перенос ВЕСОВ (wRow) — чтобы "70-60-40" не резался троеточием */
+    .wRow td{
+      height: auto;
+      white-space: normal;
+    }
+    .wRow .stickyLeft{
+      white-space: normal;
+    }
+    .wRow .leftText{
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word;
+    }
+    /* /FIX */
+
     .tinyIcon{
       border:0; background:transparent; color:var(--muted);
       padding:6px; margin:-6px;
@@ -1701,14 +1717,11 @@ function renderSetsEditor(sets, steps){
 
   const isLadder = steps>1;
 
-  // ====== ИЗМЕНЕНИЕ ТОЛЬКО ЗДЕСЬ ======
   // Для лесенки ставим inputmode="text", чтобы на мобильной клавиатуре гарантированно был дефис "-".
-  // (Раньше было inputmode="numeric", из-за чего дефиса могло не быть.)
   const ph = isLadder ? `например: ${Array.from({length:steps}).map((_,i)=> i===0?"15":"7").join("-")}` : "повторы";
   const type = isLadder ? "text" : "number";
   const inputmode = isLadder ? "text" : "numeric";
   const pattern = isLadder ? "[0-9\\-]*" : null;
-  // ====== /ИЗМЕНЕНИЕ ======
 
   wrap.innerHTML = sets.map((v, idx)=>`
     <div class="setRow" data-set-row="${idx}">
