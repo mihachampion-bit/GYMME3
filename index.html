@@ -21,7 +21,7 @@
 
       --radius:16px;
       --rowH: 44px;
-      --leftW: 160px; /* было 132px — расширили, чтобы названия читались */
+      --leftW: 132px; /* узко, чтобы видеть 2 последних тренировки */
     }
     [data-theme="dark"]{
       --bg:#0b1220; --fg:#e5e7eb; --muted:#9aa7bd; --line:#1f2a44;
@@ -119,10 +119,7 @@
     th, td{
       border-bottom: 1px solid var(--line);
       border-right: 1px solid var(--line);
-
-      /* было: height: var(--rowH);  -> из-за этого перенос “резался” */
-      min-height: var(--rowH);
-
+      height: var(--rowH);
       padding: 6px 8px;
       vertical-align: middle;
       background: var(--bg);
@@ -149,9 +146,6 @@
       min-width: var(--leftW);
       max-width: var(--leftW);
       border-right: 1px solid var(--line);
-
-      /* ключ: в левом столбце разрешаем перенос */
-      white-space: normal;
     }
     th.stickyLeft{z-index: 12}
     .corner{
@@ -162,17 +156,9 @@
       display:flex; align-items:center; gap:8px;
       min-width: 0;
     }
-
-    /* ключ: никакого ellipsis — пусть переносится */
     .leftText{
-      min-width:0;
-      overflow: visible;
-      text-overflow: clip;
-      white-space: normal;
-      word-break: break-word;
-      line-height: 1.15;
+      min-width:0; overflow:hidden; text-overflow: ellipsis;
     }
-
     .blockRow .leftText{
       text-transform: uppercase;
       font-weight: 900;
@@ -221,9 +207,6 @@
       background: var(--bg);
       min-width: 96px;
       max-width: 120px;
-
-      /* помогает мобильному “тапу” не путаться со скроллом */
-      touch-action: manipulation;
     }
     td.cell .val{
       font-weight: 800;
@@ -417,7 +400,7 @@
 
     /* small screens */
     @media (max-width: 380px){
-      :root{ --leftW: 144px; --rowH: 42px; }
+      :root{ --leftW: 120px; --rowH: 42px; }
     }
   </style>
 </head>
@@ -703,6 +686,14 @@ function sortWorkoutsAsc(workouts){
     return ta-tb;
   });
 }
+/* Отображение: самая свежая слева */
+function sortWorkoutsDesc(workouts){
+  return [...workouts].sort((a,b)=>{
+    const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+    const ta = da?da.getTime():0, tb = db?db.getTime():0;
+    return tb-ta;
+  });
+}
 
 /* Вес: сортировка по максимальному числу из строки.
    Пример "60-50" -> 60. Поддержка десятичных и запятых. */
@@ -721,6 +712,31 @@ function weightMaxNumber(label){
 /* ===========================
    Модель данных
 =========================== */
+/*
+state = {
+  theme: "light"|"dark",
+  blocks: [
+    {id,name,collapsed:false, exercises:[
+      {id,name, archived:false, splitLR:false, weights:[
+        {id,label, hidden:false}
+      ]}
+    ]}
+  ],
+  workouts: [{id,date}],
+  entries: {
+    [workoutId]: {
+      [exerciseId]: {
+        [weightId]: {
+          // если splitLR=false:
+          sets:[number], injury:boolean
+          // если splitLR=true:
+          L:{sets:[number], injury:boolean}, R:{sets:[number], injury:boolean}
+        }
+      }
+    }
+  }
+}
+*/
 function seedState(){
   const mkW = (label) => ({id: nowId(), label, hidden:false});
   const mkE = (name, weights, splitLR=false) => ({
@@ -757,6 +773,8 @@ function seedState(){
     entries: {}
   };
 
+  // примеры введённых данных
+  // жим лёжа 40: 10,10; 50: 8,8; 60-50: пусто
   const exBench = chest.exercises[0];
   const w40 = exBench.weights.find(x=>x.label==="40").id;
   const w50 = exBench.weights.find(x=>x.label==="50").id;
@@ -769,8 +787,8 @@ function seedState(){
   };
   state.entries[w2.id] = {
     [exBench.id]: {
-      [w40]: {sets:[11,10], injury:false},
-      [w50]: {sets:[8,8,7], injury:false}
+      [w40]: {sets:[11,10], injury:false}, // рекорд по сумме (21 vs 20)
+      [w50]: {sets:[8,8,7], injury:false}  // рекорд по сумме (23 vs 16)
     }
   };
 
@@ -784,6 +802,7 @@ function seedState(){
   };
 
   state.workouts = sortWorkoutsAsc(state.workouts);
+  // сортируем веса в seed
   for(const b of state.blocks){
     for(const e of b.exercises){
       e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
@@ -797,10 +816,12 @@ function loadState(){
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return seedState();
     const st = JSON.parse(raw);
+    // минимальная миграция / защита
     if(!st || !Array.isArray(st.blocks) || !Array.isArray(st.workouts) || typeof st.entries!=="object"){
       return seedState();
     }
     st.workouts = sortWorkoutsAsc(st.workouts);
+    // гарантируем поля
     st.theme = st.theme==="dark" ? "dark" : "light";
     for(const b of st.blocks){
       b.collapsed = !!b.collapsed;
@@ -949,6 +970,7 @@ $("#btnTheme").addEventListener("click", ()=>{
 });
 $("#btnExport").addEventListener("click", ()=>{
   const json = JSON.stringify(state, null, 2);
+  // мини-UX: открыть модалку с textarea и авто-копированием
   showInfo("Экспорт JSON", `
     <div style="display:flex; flex-direction:column; gap:10px">
       <div style="color:var(--muted); font-size:12px">Скопируй и сохрани где-нибудь. Это твой бэкап.</div>
@@ -1097,11 +1119,18 @@ function entryInjury(entry, splitLR, side){
 
 /* ===========================
    Правила статусов (хронология)
+   - Рекорд: reps(ячейка) > max reps по этому упражнению+весу ранее (по дате)
+   - Новый вес: первое появление веса по упражнению (раньше не было данных по этому весу)
+   - Новое упражнение: первое появление упражнения (раньше не было данных по любому весу)
+   - Серый фон: есть предыдущие данные по упражнению+весу и текущая ячейка заполнена, но рекорд не поставлен
+   - Травма: розовый фон вручную (не перебивает обводку)
 =========================== */
 function buildChronoIndex(){
+  // для быстрых вычислений: для каждого exId/wId: история по тренировкам (asc)
   const workouts = sortWorkoutsAsc(state.workouts);
   const wOrder = workouts.map(w=>w.id);
 
+  // history[exId][wId][side?] = [{workoutId, total, hasData, injury}]
   const history = {};
   for(const wid of wOrder){
     const wEntries = state.entries[wid] || {};
@@ -1140,11 +1169,12 @@ function buildChronoIndex(){
 }
 
 function goalForEmptyCell(chrono, workoutId, exId, wId, sideKey){
+  // показать "надо max+1" только если раньше была история (hasData)
   const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
   let maxPrev = -Infinity;
   let hasPrev = false;
   for(const it of seq){
-    if(it.workoutId === workoutId) break;
+    if(it.workoutId === workoutId) break; // дальше текущей даты не надо
     if(it.hasData){
       hasPrev = true;
       maxPrev = Math.max(maxPrev, it.total);
@@ -1164,6 +1194,7 @@ function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
   const injury = entryInjury(entry, split, sideKey==="N"?null:sideKey);
   const total = split ? entryTotalReps(entry,true,sideKey) : entryTotalReps(entry,false);
 
+  // определить: был ли этот вес раньше
   const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
   let maxPrev = -Infinity;
   let hadPrevDataForThisWeight = false;
@@ -1176,6 +1207,7 @@ function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
   }
   const isRecord = has && hadPrevDataForThisWeight && (total > maxPrev);
 
+  // новый вес: первое появление данных по этому весу (по хронологии)
   let isNewWeight = false;
   if(has){
     let seenBefore = false;
@@ -1186,8 +1218,10 @@ function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
     isNewWeight = !seenBefore;
   }
 
+  // новое упражнение: первое появление любых данных по любому весу этого упражнения
   let isNewEx = false;
   if(has){
+    // пройдём по всем весам упражнения и посмотрим был ли любой hasData раньше
     let anyBefore = false;
     const wOrder = chrono.wOrder;
     for(const wid of wOrder){
@@ -1208,8 +1242,10 @@ function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
     isNewEx = !anyBefore;
   }
 
+  // серый фон: есть предыдущие данные по этому весу и текущая заполнена, но рекорд не поставлен
   const gray = has && hadPrevDataForThisWeight && !isRecord;
 
+  // Приоритет обводки: рекорд > новый вес > новое упражнение
   let border = null;
   if(isRecord) border = "gold";
   else if(isNewWeight) border = "green";
@@ -1225,10 +1261,12 @@ let chronoCache = null;
 
 function renderTable(){
   state.workouts = sortWorkoutsAsc(state.workouts);
+  // кеш для статусов/целей
   chronoCache = buildChronoIndex();
 
-  const workouts = chronoCache.workouts;
+  const workouts = sortWorkoutsDesc(chronoCache.workouts);
 
+  // шапка
   let html = `<table><thead><tr>`;
   html += `<th class="stickyLeft corner"> </th>`;
   for(const w of workouts){
@@ -1242,6 +1280,7 @@ function renderTable(){
   html += `</tr></thead><tbody>`;
 
   for(const block of state.blocks){
+    // BLOCK row
     html += `<tr class="blockRow" data-block="${block.id}">
       <td class="stickyLeft">
         <div class="leftCell">
@@ -1257,6 +1296,7 @@ function renderTable(){
     for(const ex of block.exercises){
       if(ex.archived) continue;
 
+      // Exercise header row (no cells)
       html += `<tr class="exRow" data-ex="${ex.id}">
         <td class="stickyLeft">
           <div class="leftCell">
@@ -1267,6 +1307,7 @@ function renderTable(){
       for(let i=0;i<workouts.length;i++) html += `<td></td>`;
       html += `</tr>`;
 
+      // Weights (sorted asc)
       ex.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
 
       for(const w of ex.weights){
@@ -1285,12 +1326,14 @@ function renderTable(){
   html += `</tbody></table>`;
   tableWrap.innerHTML = html;
 
+  // Wire events (делаем после innerHTML)
   wireTableEvents();
 
+  // мелкий UX: скролл к самым свежим тренировкам (слева)
   if(!renderTable._didAutoScroll){
     renderTable._didAutoScroll = true;
     setTimeout(()=>{
-      tableWrap.scrollLeft = tableWrap.scrollWidth;
+      tableWrap.scrollLeft = 0;
     }, 0);
   }
 }
@@ -1339,74 +1382,8 @@ function renderWeightRow(workouts, block, ex, w, side){
   return row;
 }
 
-/* ===========================
-   FIX A): Надёжный TAP по ячейке на мобильном
-   - pointer/touch tap: короткое касание без заметного движения
-   - click оставляем как запасной вариант (десктоп)
-=========================== */
-function attachCellTap(td){
-  const TAP_MAX_MS = 450;
-  const MOVE_PX = 10;
-
-  let startX = 0, startY = 0, startT = 0;
-  let moved = false;
-  let tracking = false;
-
-  const getXY = (ev)=>{
-    if(ev.touches && ev.touches[0]) return {x: ev.touches[0].clientX, y: ev.touches[0].clientY};
-    if(ev.changedTouches && ev.changedTouches[0]) return {x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY};
-    return {x: ev.clientX ?? 0, y: ev.clientY ?? 0};
-  };
-
-  const onStart = (ev)=>{
-    // не мешаем скроллу, но начинаем трекать “тап”
-    const p = getXY(ev);
-    startX = p.x; startY = p.y;
-    startT = Date.now();
-    moved = false;
-    tracking = true;
-  };
-
-  const onMove = (ev)=>{
-    if(!tracking) return;
-    const p = getXY(ev);
-    const dx = p.x - startX;
-    const dy = p.y - startY;
-    if(Math.hypot(dx,dy) > MOVE_PX) moved = true;
-  };
-
-  const onEnd = (ev)=>{
-    if(!tracking) return;
-    tracking = false;
-
-    const dt = Date.now() - startT;
-    if(moved) return;
-    if(dt > TAP_MAX_MS) return;
-
-    const key = td.getAttribute("data-cell");
-    if(key) openCellEditor(key);
-  };
-
-  // Pointer events (современные браузеры)
-  td.addEventListener("pointerdown", onStart, {passive:true});
-  td.addEventListener("pointermove", onMove, {passive:true});
-  td.addEventListener("pointerup", onEnd, {passive:true});
-  td.addEventListener("pointercancel", ()=>{ tracking=false; }, {passive:true});
-
-  // Fallback для старых iOS/Safari (дублирование не страшно из-за tracking)
-  td.addEventListener("touchstart", onStart, {passive:true});
-  td.addEventListener("touchmove", onMove, {passive:true});
-  td.addEventListener("touchend", onEnd, {passive:true});
-  td.addEventListener("touchcancel", ()=>{ tracking=false; }, {passive:true});
-
-  // Desktop fallback
-  td.addEventListener("click", ()=>{
-    const key = td.getAttribute("data-cell");
-    if(key) openCellEditor(key);
-  });
-}
-
 function wireTableEvents(){
+  // toggle block collapse
   $$("[data-toggle-block]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const id = btn.getAttribute("data-toggle-block");
@@ -1418,6 +1395,7 @@ function wireTableEvents(){
     });
   });
 
+  // toggle weight hidden (soft-hide)
   $$("[data-toggle-weight]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
@@ -1427,10 +1405,12 @@ function wireTableEvents(){
       fw.w.hidden = !fw.w.hidden;
       saveState();
       renderAll();
+      // меню тоже обновим, если открыто
       if(drawer.classList.contains("show")) refreshWeightsList();
     });
   });
 
+  // delete workout
   $$("[data-del-workout]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
@@ -1446,9 +1426,11 @@ function wireTableEvents(){
     });
   });
 
-  // FIX A): вместо “просто click” — надёжный тап
+  // cell click -> editor
   $$(".cell[data-cell]").forEach(td=>{
-    attachCellTap(td);
+    td.addEventListener("click", ()=>{
+      openCellEditor(td.getAttribute("data-cell"));
+    });
   });
 
   // long-press on date header -> stats
@@ -1458,7 +1440,7 @@ function wireTableEvents(){
     let timer = null;
     let moved = false;
 
-    const start = ()=>{
+    const start = (ev)=>{
       moved = false;
       timer = setTimeout(()=>{
         timer = null;
@@ -1494,6 +1476,7 @@ $("#btnAddWorkout").addEventListener("click", ()=>{
     return;
   }
   const date = fmtDate(d);
+  // допускаем одинаковые даты? обычно нет, но пусть можно.
   state.workouts.push({id: nowId(), date});
   state.workouts = sortWorkoutsAsc(state.workouts);
   saveState();
@@ -1522,9 +1505,11 @@ function openCellEditor(cellKey){
   $("#cellTitle").textContent = `${ex.name} • ${fw.w.label}${sideName}`;
   $("#cellSubtitle").textContent = `${wo.date} • ввод: повторы по сетам`;
 
+  // заполнить sets
   const sets = split ? (entry[side].sets||[]) : (entry.sets||[]);
   renderSetsEditor(sets);
 
+  // injury
   const inj = split ? !!entry[side].injury : !!entry.injury;
   $("#btnToggleInjury").textContent = inj ? "Вкл" : "Выкл";
   $("#btnToggleInjury").dataset.on = inj ? "1" : "0";
@@ -1603,6 +1588,7 @@ $("#btnSaveCell").addEventListener("click", ()=>{
   if(!split){
     entry.sets = nums;
     entry.injury = injuryOn;
+    // если полностью пусто и травма выключена — удаляем запись
     if(entry.sets.length===0 && !entry.injury){
       setCellEntry(workoutId, exId, wId, null);
     }else{
@@ -1635,9 +1621,11 @@ function openWorkoutStats(workoutId){
   if(!wo) return;
 
   chronoCache = buildChronoIndex();
+  const workouts = chronoCache.workouts;
 
+  // прогоняем все ячейки и считаем
   let records = 0, newWeights = 0, newExercises = 0;
-  const setsByBlock = {};
+  const setsByBlock = {}; // blockName => sets count
   for(const b of state.blocks){
     setsByBlock[b.name] = 0;
     for(const ex of b.exercises){
@@ -1705,8 +1693,10 @@ function openWorkoutStats(workoutId){
    Меню: добавить/управлять
 =========================== */
 function refreshMenuSelects(){
+  // blocks
   $("#selBlockAddEx").innerHTML = state.blocks.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
 
+  // exercises lists
   const exs = allExercises();
   const exOpt = exs.map(({block,ex})=>{
     const mark = ex.archived ? " (архив)" : "";
@@ -1793,6 +1783,7 @@ $("#btnAddWeight").addEventListener("click", ()=>{
   const fe = findExercise(exId);
   if(!fe) return;
 
+  // если уже есть такой label — не дублируем
   if(fe.ex.weights.some(w=>String(w.label).trim()===label)){
     alert("Такой вес уже есть у этого упражнения.");
     return;
@@ -1812,6 +1803,9 @@ $("#btnToggleSplit").addEventListener("click", ()=>{
 
   fe.ex.splitLR = !fe.ex.splitLR;
 
+  // миграция существующих entries этого упражнения:
+  // если включили split — переносим sets в обе стороны? НЕТ. Правильнее: старые данные считаем как N и кладём в L, R пусто.
+  // если выключили split — суммировать L+R? НЕТ. Правильнее: сохраняем как N = L (если есть) иначе R.
   for(const wid of Object.keys(state.entries)){
     const wEntries = state.entries[wid] || {};
     const exMap = wEntries[exId] || null;
@@ -1820,6 +1814,7 @@ $("#btnToggleSplit").addEventListener("click", ()=>{
     for(const wId of Object.keys(exMap)){
       const ent = exMap[wId];
       if(fe.ex.splitLR){
+        // стало splitLR=true
         if(ent && !ent.L && !ent.R){
           exMap[wId] = {
             L:{sets: (ent.sets||[]), injury: !!ent.injury},
@@ -1827,6 +1822,7 @@ $("#btnToggleSplit").addEventListener("click", ()=>{
           };
         }
       }else{
+        // стало splitLR=false
         if(ent && (ent.L || ent.R)){
           const pick = (ent.L && (ent.L.sets||[]).length>0) ? ent.L : (ent.R || {sets:[],injury:false});
           exMap[wId] = {sets: (pick.sets||[]), injury: !!pick.injury};
@@ -1857,7 +1853,9 @@ $("#btnDeleteExercise").addEventListener("click", ()=>{
   const exName = fe.ex.name;
   if(!confirm(`Удалить упражнение "${exName}" навсегда? Это удалит всю историю.`)) return;
 
+  // удалить из блока
   fe.block.exercises = fe.block.exercises.filter(e=>e.id!==exId);
+  // удалить все entries
   for(const wid of Object.keys(state.entries)){
     if(state.entries[wid] && state.entries[wid][exId]){
       delete state.entries[wid][exId];
@@ -1871,10 +1869,10 @@ $("#btnDeleteExercise").addEventListener("click", ()=>{
 /* ===========================
    Аналитика (canvas)
 =========================== */
-/* ... (дальше у тебя без изменений, я оставил как было) ... */
-
 function refreshAnalyticsSelects(){
+  // block options
   anBlock.innerHTML = state.blocks.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+  // default: first block
   const bId = anBlock.value || (state.blocks[0]?.id);
   if(bId) anBlock.value = bId;
   refreshAnalyticsExerciseList();
@@ -1907,8 +1905,9 @@ function renderAnalytics(){
   const ex = fe.ex;
   const workouts = chronoCache.workouts;
 
+  // собрать точки по тренировкам
   const points = [];
-  const perWorkoutStats = [];
+  const perWorkoutStats = []; // {records, injuries}
   for(const wo of workouts){
     let volume = 0;
     let reps = 0;
@@ -1916,13 +1915,19 @@ function renderAnalytics(){
     let injuries = 0;
 
     for(const w of ex.weights){
+      // считаем и скрытые веса? В аналитике лучше считать и скрытые, если есть данные — берём все веса
       const entry = getCellEntry(wo.id, exId, w.id);
       if(!ex.splitLR){
         if(entryHasData(entry,false)){
           const total = entryTotalReps(entry,false);
           reps += total;
           const wt = weightMaxNumber(w.label);
-          if(Number.isFinite(wt)) volume += (total * wt);
+          if(Number.isFinite(wt)) volume += (entrySetsCount(entry,false) * (total/Math.max(1, entrySetsCount(entry,false))) * wt); 
+          // выше хитро: sets * avgReps * weight = sumReps * weight (если sets>0)
+          // проще: sumReps * weight:
+          volume += 0; // компенсируем ниже нормальной формулой
+          volume = volume - 0; // noop
+          volume += (total * wt);
 
           const st = computeCellStatus(chronoCache, wo.id, exId, w.id, "N");
           if(st.isRecord) records++;
@@ -1948,11 +1953,13 @@ function renderAnalytics(){
     points.push({x: wo.date, volume, reps, records, injuries});
   }
 
+  // выбрать метрику
   const metric = anMetric.value;
   const yVals = points.map(p => p[metric] || 0);
 
   drawLineChart(points.map(p=>p.x), yVals, metricLabel(metric));
 
+  // KPI
   const totalWorkouts = workouts.length;
   const totalRecords = perWorkoutStats.reduce((a,b)=>a+b.records,0);
   const totalInj = perWorkoutStats.reduce((a,b)=>a+b.injuries,0);
@@ -1967,6 +1974,7 @@ function renderAnalytics(){
     <div class="kpi"><b>${totalInj}</b><small>травм (меток)</small></div>
   `;
 
+  // Insights: месяц к месяцу по объёму (основная метрика)
   const insightHtml = buildInsights(perWorkoutStats, ex);
   insights.innerHTML = insightHtml;
 }
@@ -1985,6 +1993,7 @@ function monthKey(dateStr){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
 }
 function buildInsights(perWorkoutStats, ex){
+  // группировка по месяцам
   const byMonth = {};
   for(const it of perWorkoutStats){
     const k = monthKey(it.date);
@@ -2015,6 +2024,8 @@ function buildInsights(perWorkoutStats, ex){
     html += `<div style="margin-top:8px" class="muted">Недостаточно месяцев для сравнения.</div>`;
   }
 
+  // “травмы чаще на больших весах”
+  // простая эвристика: берем все injury-ячейки упражнения, смотрим их веса; сравниваем со медианой всех использованных весов
   const usedWeights = [];
   const injuryWeights = [];
   for(const wo of chronoCache.workouts){
@@ -2075,16 +2086,19 @@ function drawLineChart(labels, values, title){
 
   ctx.clearRect(0,0,W,H);
 
+  // padding
   const padL = 50, padR = 16, padT = 24, padB = 46;
   const x0 = padL, y0 = padT, x1 = W-padR, y1 = H-padB;
   const innerW = x1-x0, innerH = y1-y0;
 
+  // axis / grid
   const line = getVar("--line");
   const fg = getVar("--fg");
   const muted = getVar("--muted");
   ctx.strokeStyle = line;
   ctx.lineWidth = 1;
 
+  // grid horizontal
   const maxV = Math.max(...values, 0);
   const minV = Math.min(...values, 0);
   const span = Math.max(maxV - minV, 1);
@@ -2105,12 +2119,14 @@ function drawLineChart(labels, values, title){
     ctx.fillText(formatAxis(v), x0-8, y);
   }
 
+  // title
   ctx.fillStyle = fg;
   ctx.font = "16px system-ui";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText(title, x0, 2);
 
+  // points
   const n = labels.length;
   if(n===0){
     drawEmptyChart("Нет данных");
@@ -2120,6 +2136,7 @@ function drawLineChart(labels, values, title){
   const xAt = (i)=> x0 + (n===1 ? innerW/2 : innerW*(i/(n-1)));
   const yAt = (v)=> y0 + innerH*( (maxV - v)/span );
 
+  // line
   ctx.strokeStyle = getVar("--accent");
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -2131,6 +2148,7 @@ function drawLineChart(labels, values, title){
   }
   ctx.stroke();
 
+  // dots
   ctx.fillStyle = getVar("--accent");
   for(let i=0;i<n;i++){
     const x = xAt(i), y = yAt(values[i]||0);
@@ -2139,6 +2157,7 @@ function drawLineChart(labels, values, title){
     ctx.fill();
   }
 
+  // x labels (last 3)
   ctx.fillStyle = muted;
   ctx.font = "12px system-ui";
   ctx.textAlign = "center";
@@ -2152,6 +2171,7 @@ function drawLineChart(labels, values, title){
 }
 
 function formatAxis(v){
+  // коротко
   if(v>=1000) return Math.round(v/100)/10 + "k";
   return String(Math.round(v));
 }
@@ -2179,6 +2199,7 @@ function escapeAttr(s){
 function renderAll(){
   renderTable();
   refreshMenuSelects();
+  // аналитика: если на вкладке — перерисовать
   if(viewAnalytics.classList.contains("active")) renderAnalytics();
 }
 renderAll();
