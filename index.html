@@ -1700,10 +1700,15 @@ function renderSetsEditor(sets, steps){
   if(!sets || sets.length===0) sets = [""];
 
   const isLadder = steps>1;
+
+  // ====== ИЗМЕНЕНИЕ ТОЛЬКО ЗДЕСЬ ======
+  // Для лесенки ставим inputmode="text", чтобы на мобильной клавиатуре гарантированно был дефис "-".
+  // (Раньше было inputmode="numeric", из-за чего дефиса могло не быть.)
   const ph = isLadder ? `например: ${Array.from({length:steps}).map((_,i)=> i===0?"15":"7").join("-")}` : "повторы";
   const type = isLadder ? "text" : "number";
-  const inputmode = "numeric";
+  const inputmode = isLadder ? "text" : "numeric";
   const pattern = isLadder ? "[0-9\\-]*" : null;
+  // ====== /ИЗМЕНЕНИЕ ======
 
   wrap.innerHTML = sets.map((v, idx)=>`
     <div class="setRow" data-set-row="${idx}">
