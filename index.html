@@ -185,6 +185,22 @@
       flex: 0 0 auto;
     }
 
+    /* FIX: перенос названий упражнений (exRow) */
+    .exRow td{
+      height: auto;              /* строка упражнения может быть выше rowH */
+      white-space: normal;       /* снимаем nowrap */
+    }
+    .exRow .stickyLeft{
+      white-space: normal;
+    }
+    .exRow .leftText{
+      white-space: normal;       /* перенос */
+      overflow: visible;         /* не обрезаем */
+      text-overflow: clip;       /* без ... */
+      word-break: break-word;
+    }
+    /* /FIX */
+
     .tinyIcon{
       border:0; background:transparent; color:var(--muted);
       padding:6px; margin:-6px;
@@ -686,7 +702,7 @@ function sortWorkoutsAsc(workouts){
     return ta-tb;
   });
 }
-/* Отображение: самая свежая слева */
+// отображение: свежая слева
 function sortWorkoutsDesc(workouts){
   return [...workouts].sort((a,b)=>{
     const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
@@ -1264,6 +1280,7 @@ function renderTable(){
   // кеш для статусов/целей
   chronoCache = buildChronoIndex();
 
+  // ВАЖНО: показываем свежие слева
   const workouts = sortWorkoutsDesc(chronoCache.workouts);
 
   // шапка
@@ -1329,7 +1346,7 @@ function renderTable(){
   // Wire events (делаем после innerHTML)
   wireTableEvents();
 
-  // мелкий UX: скролл к самым свежим тренировкам (слева)
+  // UX: стартуем на свежих (слева)
   if(!renderTable._didAutoScroll){
     renderTable._didAutoScroll = true;
     setTimeout(()=>{
@@ -1440,7 +1457,7 @@ function wireTableEvents(){
     let timer = null;
     let moved = false;
 
-    const start = (ev)=>{
+    const start = ()=>{
       moved = false;
       timer = setTimeout(()=>{
         timer = null;
@@ -1621,7 +1638,6 @@ function openWorkoutStats(workoutId){
   if(!wo) return;
 
   chronoCache = buildChronoIndex();
-  const workouts = chronoCache.workouts;
 
   // прогоняем все ячейки и считаем
   let records = 0, newWeights = 0, newExercises = 0;
@@ -1804,8 +1820,8 @@ $("#btnToggleSplit").addEventListener("click", ()=>{
   fe.ex.splitLR = !fe.ex.splitLR;
 
   // миграция существующих entries этого упражнения:
-  // если включили split — переносим sets в обе стороны? НЕТ. Правильнее: старые данные считаем как N и кладём в L, R пусто.
-  // если выключили split — суммировать L+R? НЕТ. Правильнее: сохраняем как N = L (если есть) иначе R.
+  // если включили split — старые данные считаем как N и кладём в L, R пусто.
+  // если выключили split — сохраняем как N = L (если есть) иначе R.
   for(const wid of Object.keys(state.entries)){
     const wEntries = state.entries[wid] || {};
     const exMap = wEntries[exId] || null;
@@ -1922,12 +1938,7 @@ function renderAnalytics(){
           const total = entryTotalReps(entry,false);
           reps += total;
           const wt = weightMaxNumber(w.label);
-          if(Number.isFinite(wt)) volume += (entrySetsCount(entry,false) * (total/Math.max(1, entrySetsCount(entry,false))) * wt); 
-          // выше хитро: sets * avgReps * weight = sumReps * weight (если sets>0)
-          // проще: sumReps * weight:
-          volume += 0; // компенсируем ниже нормальной формулой
-          volume = volume - 0; // noop
-          volume += (total * wt);
+          if(Number.isFinite(wt)) volume += (total * wt);
 
           const st = computeCellStatus(chronoCache, wo.id, exId, w.id, "N");
           if(st.isRecord) records++;
@@ -2025,7 +2036,6 @@ function buildInsights(perWorkoutStats, ex){
   }
 
   // “травмы чаще на больших весах”
-  // простая эвристика: берем все injury-ячейки упражнения, смотрим их веса; сравниваем со медианой всех использованных весов
   const usedWeights = [];
   const injuryWeights = [];
   for(const wo of chronoCache.workouts){
