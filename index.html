@@ -125,12 +125,18 @@
       background: var(--bg);
       white-space: nowrap;
     }
-    th{
-      position: sticky; top: 0; z-index: 5;
+
+    /* FIX: закрепление дат тренировок при вертикальном скролле (thead) */
+    thead th{
+      position: sticky;
+      top: 0;
+      z-index: 9;
       background: var(--stickyBg);
       backdrop-filter: blur(10px);
       font-weight: 800;
     }
+    /* /FIX */
+
     th:first-child, td:first-child{
       border-left: 1px solid var(--line);
     }
@@ -1032,7 +1038,7 @@ $("#btnHelp").addEventListener("click", ()=>{
       </div>
       <hr style="border:none; border-top:1px solid var(--line)">
       <div style="color:var(--muted); font-size:12px">
-        <b>Цель “надо X”</b> показывается только в пустых ячейках, если уже есть история по этому упражнению+весу.
+        <b>Цель “надо X”</b> показывается только в пустых ячейках самой свежей тренировки (по дате), если уже есть история по этому упражнению+весу.
       </div>
     </div>
   `);
@@ -1525,6 +1531,12 @@ function renderWeightRow(workouts, block, ex, w, side){
   const label = `${escapeHtml(w.label)}`;
   const steps = weightStepsFromLabel(w.label);
 
+  // FIX: цель “надо …” показываем только в самой свежей тренировке (по дате)
+  const newestWorkoutId = chronoCache?.workouts?.length
+    ? chronoCache.workouts[chronoCache.workouts.length - 1].id
+    : null;
+  // /FIX
+
   let row = `<tr class="wRow" data-ex="${ex.id}" data-weight="${w.id}" data-side="${side}">
     <td class="stickyLeft">
       <div class="leftCell">
@@ -1540,7 +1552,12 @@ function renderWeightRow(workouts, block, ex, w, side){
     const has = entryHasData(entry, split, side==="N"?null:side);
 
     const status = computeCellStatus(chronoCache, wo.id, ex.id, w.id, side);
-    const goal = (!has) ? goalForEmptyCell(chronoCache, wo.id, ex.id, w.id, side) : null;
+
+    // FIX: “надо …” только в самой свежей по дате тренировке
+    const goal = (!has && newestWorkoutId && wo.id === newestWorkoutId)
+      ? goalForEmptyCell(chronoCache, wo.id, ex.id, w.id, side)
+      : null;
+    // /FIX
 
     const best = has ? entryBestDisplayValue(entry, split, side==="N"?null:side, steps) : null;
 
