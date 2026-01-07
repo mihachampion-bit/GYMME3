@@ -1,132 +1,1102 @@
-Идея сильная, многослойная и — что важно — литературно жизнеспособная. Ниже разберу честно и без рекламного тумана, как если бы рукопись легла на стол редактора, который видел слишком многое и потому уже трудно удивляется.
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Gym Progress — offline</title>
+  <style>
+    :root{
+      --bg:#ffffff; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0;
+      --card:#f8fafc; --card2:#f1f5f9;
+      --accent:#2563eb; --danger:#dc2626;
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
 
-а) Насколько это может быть востребовано
+      --stickyBg: rgba(255,255,255,.92);
 
-Коротко: да, востребовано. Не массовый «локомотив», но очень хорошая умная популярная проза с долгой жизнью.
+      --gold:#f59e0b;     /* рекорд */
+      --green:#22c55e;    /* новый вес */
+      --yellow:#eab308;   /* новое упражнение */
+      --grayFill:#f1f5f9; /* не рекорд */
+      --injuryFill:#ffe4f1; /* травма (розовый) */
 
-Почему:
+      --radius:16px;
+      --rowH: 44px;
+      --leftW: 132px; /* узко, чтобы видеть 2 последних тренировки */
+    }
+    [data-theme="dark"]{
+      --bg:#0b1220; --fg:#e5e7eb; --muted:#9aa7bd; --line:#1f2a44;
+      --card:#0f172a; --card2:#111c33;
+      --accent:#60a5fa; --danger:#f87171;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --stickyBg: rgba(11,18,32,.88);
 
-Формат блога / записей
-Это один из самых комфортных для современного читателя форматов. Он снимает страх «большого романа», позволяет читать фрагментарно, возвращаться, делать паузы. 300 страниц, разбитые на посты, психологически ощущаются как 180–220.
+      --grayFill:#101a31;
+      --injuryFill:#3a1530;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font: 14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg); color:var(--fg);
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    button,input,select{font:inherit}
+    .app{
+      min-height:100%;
+      display:flex; flex-direction:column;
+    }
+    .topbar{
+      position:sticky; top:0; z-index:50;
+      backdrop-filter: blur(10px);
+      background: var(--stickyBg);
+      border-bottom:1px solid var(--line);
+      padding: 10px 12px calc(10px + env(safe-area-inset-top));
+    }
+    .topbar .row{
+      display:flex; align-items:center; gap:10px;
+    }
+    .brand{
+      display:flex; flex-direction:column; gap:2px;
+      min-width: 0;
+    }
+    .brand b{font-weight:800; letter-spacing:.2px}
+    .brand small{color:var(--muted)}
+    .spacer{flex:1}
+    .btn{
+      border:1px solid var(--line);
+      background: var(--card);
+      color: var(--fg);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display:inline-flex; align-items:center; gap:8px;
+      box-shadow: none;
+      cursor:pointer;
+      touch-action: manipulation;
+    }
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{
+      border-color: transparent;
+      background: var(--accent);
+      color: white;
+    }
+    .btn.icon{
+      width:42px; justify-content:center; padding:10px;
+    }
+    .seg{
+      display:flex; gap:6px; padding:6px;
+      border:1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+    }
+    .seg button{
+      border:0; background:transparent; color:var(--muted);
+      padding:8px 10px; border-radius: 10px;
+      cursor:pointer;
+    }
+    .seg button.active{
+      background: var(--card2);
+      color: var(--fg);
+      font-weight:700;
+    }
 
-Тема заботы о человеке без назидательности
-Ты не рассказываешь, как правильно жить. Ты показываешь, как жизнь иногда слегка подталкивают — и этого достаточно. Сейчас это редкая и очень востребованная интонация:
-не «мотивация»,
-не «психология успеха»,
-а тихое благожелательное присутствие.
+    .content{flex:1; display:flex; flex-direction:column; min-height:0}
+    .view{flex:1; min-height:0; display:none}
+    .view.active{display:flex; flex-direction:column; min-height:0}
 
-Сенсорная литература
-Запахи — почти неосвоенное поле. Зрение и слух выжаты до сухости. Обоняние — глубинное, телесное, связанное с памятью и бессознательным. Это цепляет читателя сильнее, чем он ожидает.
+    /* TABLE */
+    .tableWrap{
+      flex:1; min-height:0;
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 10px 0;
+    }
+    table{
+      border-collapse: separate;
+      border-spacing: 0;
+      width:max-content;
+      min-width: 100%;
+      position: relative; /* FIX: помогает sticky-элементам внутри таблицы */
+    }
+    th, td{
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      height: var(--rowH);
+      padding: 6px 8px;
+      vertical-align: middle;
+      background: var(--bg);
+      white-space: nowrap;
+    }
 
-Анти-цинизм без наивности
-Книга воодушевляющая, но не слащавая. Судьбы меняются не потому, что «мир добр», а потому что кто-то вовремя оказался рядом. Это взрослая надежда. Сейчас она в дефиците.
+    /* FIX: закрепление строк заголовка (дат тренировок) при вертикальном скролле */
+    thead{
+      position: sticky;
+      top: 0;
+      z-index: 15;
+      background: var(--stickyBg);
+      backdrop-filter: blur(10px);
+    }
+    thead tr{
+      background: var(--stickyBg);
+    }
+    thead th{
+      position: sticky;
+      top: 0;
+      z-index: 16;
+      background: var(--stickyBg);
+      backdrop-filter: blur(10px);
+      font-weight: 800;
+    }
+    /* /FIX */
 
-Аудитория:
+    th:first-child, td:first-child{
+      border-left: 1px solid var(--line);
+    }
+    tr:first-child th{
+      border-top: 1px solid var(--line);
+    }
 
-читатели Пелевина раннего, но уставшие от его холода;
+    .stickyLeft{
+      position: sticky; left: 0; z-index: 8;
+      background: var(--stickyBg);
+      backdrop-filter: blur(10px);
+      width: var(--leftW);
+      min-width: var(--leftW);
+      max-width: var(--leftW);
+      border-right: 1px solid var(--line);
+    }
+    th.stickyLeft{z-index: 18}
+    .corner{
+      z-index: 25 !important;
+    }
 
-поклонники «магического реализма без магии»;
+    .leftCell{
+      display:flex; align-items:center; gap:8px;
+      min-width: 0;
+    }
+    .leftText{
+      min-width:0; overflow:hidden; text-overflow: ellipsis;
+    }
+    .blockRow .leftText{
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: .8px;
+    }
+    .exRow .leftText{
+      font-weight: 800;
+      text-transform: lowercase;
+      padding-left: 10px;
+    }
+    .wRow .leftText{
+      font-weight: 500;
+      text-transform: lowercase;
+      padding-left: 22px;
+      color: var(--muted);
+    }
+    .wRow .sideTag{
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--card);
+      flex: 0 0 auto;
+    }
 
-люди 30–55, особенно те, кто пережил спад, утрату профессии, славы, чувств.
+    /* перенос названий упражнений */
+    .exRow td{
+      height: auto;
+      white-space: normal;
+    }
+    .exRow .stickyLeft{
+      white-space: normal;
+    }
+    .exRow .leftText{
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word;
+    }
 
-б) Насколько это оригинально и на что похоже
-Оригинальность — в комбинации, не в одном элементе
+    /* перенос ВЕСОВ */
+    .wRow td{
+      height: auto;
+      white-space: normal;
+    }
+    .wRow .stickyLeft{
+      white-space: normal;
+    }
+    .wRow .leftText{
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word;
+    }
 
-По отдельности элементы знакомы:
+    .tinyIcon{
+      border:0; background:transparent; color:var(--muted);
+      padding:6px; margin:-6px;
+      cursor:pointer;
+    }
+    .tinyIcon:active{transform: translateY(1px)}
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--muted);
+      font-size: 12px;
+    }
 
-дар → есть;
+    td.cell{
+      position: relative;
+      cursor: pointer;
+      background: var(--bg);
+      min-width: 96px;
+      max-width: 120px;
+    }
+    td.cell .val{
+      font-weight: 800;
+      font-size: 13px;
+      line-height: 1.1;
+    }
+    td.cell .sub{
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      overflow:hidden; text-overflow: ellipsis;
+    }
+    td.cell.empty .val{color: var(--muted); font-weight: 700}
+    td.cell.empty .sub{display:none}
 
-запахи → были;
+    /* statuses */
+    td.cell.gray{ background: var(--grayFill); }
+    td.cell.injury{ background: var(--injuryFill); }
+    td.cell.border-gold{ box-shadow: inset 0 0 0 2px var(--gold); }
+    td.cell.border-green{ box-shadow: inset 0 0 0 2px var(--green); }
+    td.cell.border-yellow{ box-shadow: inset 0 0 0 2px var(--yellow); }
 
-блог / дневник → тысячу раз;
+    /* header date cell controls */
+    .dateHead{
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+    }
+    .dateHead .d{font-weight:900}
+    .dateHead .trash{
+      border:0; background:transparent; color:var(--muted);
+      cursor:pointer; padding:6px; margin:-6px; border-radius:10px;
+    }
+    .dateHead .trash:active{transform: translateY(1px)}
+    .hintRow{
+      padding: 0 12px 12px;
+      display:flex; align-items:center; gap:8px; flex-wrap: wrap;
+      color: var(--muted);
+    }
 
-истории изменённых судеб → классика.
+    /* Drawer */
+    .overlay{
+      position:fixed; inset:0; background: rgba(2,6,23,.35);
+      display:none; z-index:100;
+    }
+    .overlay.show{display:block}
+    .drawer{
+      position:fixed; top:0; right:0; bottom:0;
+      width:min(92vw, 420px);
+      background: var(--bg);
+      border-left: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      transform: translateX(100%);
+      transition: transform .18s ease;
+      z-index:110;
+      display:flex; flex-direction:column;
+      padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    }
+    .drawer.show{transform: translateX(0)}
+    .drawer header{
+      display:flex; align-items:center; gap:10px;
+      padding: 6px 2px 10px;
+      border-bottom:1px solid var(--line);
+    }
+    .drawer header b{font-size:16px}
+    .drawer .body{flex:1; overflow:auto; padding-top: 10px}
+    .section{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .section h3{
+      margin:0 0 8px 0; font-size: 13px; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted);
+    }
+    .grid2{display:grid; grid-template-columns: 1fr 1fr; gap:8px}
+    .field{display:flex; flex-direction:column; gap:6px; margin-bottom:8px}
+    .field label{font-size:12px; color:var(--muted)}
+    input[type="text"], input[type="number"], select{
+      border:1px solid var(--line);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 12px;
+      padding: 10px 10px;
+      outline:none;
+    }
+    .rowActions{display:flex; gap:8px; flex-wrap: wrap}
+    .danger{border-color: rgba(220,38,38,.35); color: var(--danger); background: transparent}
 
-Но в такой связке — это редкость. Ты попал в точку, где идеи не копируют друг друга, а усиливаются.
+    /* Modal */
+    .modalOverlay{
+      position:fixed; inset:0; background: rgba(2,6,23,.38);
+      display:none; z-index:200;
+      padding: 12px;
+    }
+    .modalOverlay.show{display:flex; align-items:center; justify-content:center}
+    .modal{
+      width:min(96vw, 520px);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modal header{
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background: var(--card);
+    }
+    .modal header b{font-size: 14px}
+    .modal main{padding: 12px}
+    .modal footer{
+      padding: 12px;
+      border-top: 1px solid var(--line);
+      display:flex; gap:8px; justify-content:flex-end;
+      background: var(--card);
+    }
+    .sets{
+      display:flex; flex-direction:column; gap:8px;
+      margin: 8px 0 10px;
+    }
+    .setRow{
+      display:flex; gap:8px; align-items:center;
+    }
+    .setRow input{flex:1}
+    .setRow button{
+      width: 42px;
+    }
+    .toggleLine{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      margin-top: 8px;
+    }
+    .toggleLine .left{display:flex; align-items:center; gap:10px}
+    .badge{
+      font-size:12px; padding: 4px 8px; border-radius:999px; border:1px solid var(--line);
+      background: var(--bg); color: var(--muted);
+    }
 
-На что это похоже (и чем отличается)
-1. Патрик Зюскинд, «Парфюмер»
+    /* Analytics */
+    .analyticsWrap{
+      padding: 12px;
+      display:flex; flex-direction:column; gap:10px;
+      min-height:0;
+    }
+    .panel{
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: 10px;
+    }
+    .panel h3{
+      margin:0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing:.8px; color: var(--muted);
+    }
+    canvas{
+      width:100%; height: 180px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      display:block;
+    }
+    .insights{
+      display:flex; flex-direction:column; gap:8px;
+      color: var(--fg);
+    }
+    .insights .muted{color:var(--muted); font-size:12px}
+    .kpiRow{display:flex; gap:8px; flex-wrap:wrap}
+    .kpi{
+      flex:1; min-width: 130px;
+      border:1px solid var(--line);
+      border-radius: 14px;
+      background: var(--bg);
+      padding: 10px;
+    }
+    .kpi b{display:block; font-size:16px}
+    .kpi small{color:var(--muted)}
+    .legendLine{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .dot{width:10px; height:10px; border-radius:3px; border:2px solid transparent; display:inline-block}
+    .dot.gold{border-color: var(--gold)}
+    .dot.green{border-color: var(--green)}
+    .dot.yellow{border-color: var(--yellow)}
+    .dot.gray{background: var(--grayFill); border-color: var(--line)}
+    .dot.pink{background: var(--injuryFill); border-color: var(--line)}
+    .helpLink{
+      text-decoration:none; color: var(--accent); font-weight:700;
+    }
 
-Сравнение неизбежно — и это нормально.
+    @media (max-width: 380px){
+      :root{ --leftW: 120px; --rowH: 42px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="row">
+      <button class="btn icon" id="btnMenu" aria-label="Меню">☰</button>
+      <div class="brand">
+        <b>Gym Progress</b>
+        <small id="subTitle">offline • таблица</small>
+      </div>
 
-Но:
-Гренуй — это роман о власти над людьми через запах.
-Твой герой — о служении без обладания.
+      <div class="spacer"></div>
 
-Гренуй берёт.
-Твой герой отдаёт — и каждый раз теряет часть себя.
+      <div class="seg" role="tablist" aria-label="Экраны">
+        <button id="tabTable" class="active" role="tab" aria-selected="true">Таблица</button>
+        <button id="tabAnalytics" role="tab" aria-selected="false">Аналитика</button>
+      </div>
 
-Это принципиально другая этика. Очень важно это подчеркнуть не декларацией, а поступками.
+      <button class="btn primary" id="btnAddWorkout">+ тренировка</button>
+      <button class="btn icon" id="btnHelp" aria-label="Легенда">?</button>
+    </div>
+  </div>
 
-2. Давид Фонкинос / Фредерик Бегбедер (светлая линия)
+  <div class="content">
+    <div class="hintRow" id="hintRow">
+      <span class="pill">Тап по ячейке → редактировать</span>
+      <span class="pill">Long-press по дате (~0.7s) → статистика</span>
+    </div>
 
-От них — легкость, современность, внимание к частной жизни, но без их нарциссизма.
+    <section class="view active" id="viewTable" aria-label="Таблица">
+      <div class="tableWrap" id="tableWrap"></div>
+    </section>
 
-3. Митч Элбом («Пять встреч на небесах»)
+    <section class="view" id="viewAnalytics" aria-label="Аналитика">
+      <div class="analyticsWrap">
+        <div class="panel">
+          <h3>Фильтры</h3>
+          <div class="grid2">
+            <div class="field">
+              <label>Блок</label>
+              <select id="anBlock"></select>
+            </div>
+            <div class="field">
+              <label>Упражнение</label>
+              <select id="anExercise"></select>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Метрика</label>
+            <select id="anMetric">
+              <option value="volume">Объём (sets × reps × weight)</option>
+              <option value="reps">Повторы (сумма reps)</option>
+              <option value="records">Рекорды (за тренировку)</option>
+              <option value="injuries">Травмы (за тренировку)</option>
+            </select>
+          </div>
+        </div>
 
-Структурно близко:
-череда историй → единый смысл → завещание.
+        <div class="panel">
+          <h3>График</h3>
+          <canvas id="chart" width="800" height="360"></canvas>
+          <div class="legendLine" style="margin-top:8px; color:var(--muted); font-size:12px">
+            <span>Простой график без библиотек. Масштаб авто.</span>
+          </div>
+        </div>
 
-Но у тебя глубже сенсорика и меньше морализаторства.
+        <div class="panel">
+          <h3>Ключевые показатели</h3>
+          <div class="kpiRow" id="kpiRow"></div>
+          <div class="insights" id="insights" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
 
-4. Мураками (ранний)
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-label="Меню">
+  <header>
+    <b>Меню</b>
+    <div class="spacer"></div>
+    <button class="btn icon" id="btnCloseDrawer" aria-label="Закрыть">✕</button>
+  </header>
 
-Не по сюжету, а по ощущению:
+  <div class="body">
+    <div class="section">
+      <h3>Тема</h3>
+      <div class="toggleLine">
+        <div class="left">
+          <span class="badge">🌙</span>
+          <div>
+            <b style="display:block">Ночной режим</b>
+            <small style="color:var(--muted)">Сохраняется локально</small>
+          </div>
+        </div>
+        <button class="btn" id="btnTheme">Переключить</button>
+      </div>
+    </div>
 
-тихое чудо,
+    <div class="section">
+      <h3>Добавить упражнение</h3>
+      <div class="field">
+        <label>Блок</label>
+        <select id="selBlockAddEx"></select>
+      </div>
+      <div class="field">
+        <label>Название (как хочешь)</label>
+        <input id="inExName" type="text" placeholder="например: жим лёжа" />
+      </div>
+      <div class="rowActions">
+        <button class="btn primary" id="btnAddExercise">Добавить</button>
+      </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Упражнения можно архивировать, чтобы не мешали, но история останется.
+      </div>
+    </div>
 
-дар как бремя,
+    <div class="section">
+      <h3>Добавить вес</h3>
+      <div class="field">
+        <label>Упражнение</label>
+        <select id="selExAddWeight"></select>
+      </div>
+      <div class="field">
+        <label>Вес (например: 40 или 60-50)</label>
+        <input id="inWeightLabel" type="text" placeholder="40" />
+      </div>
+      <div class="rowActions">
+        <button class="btn primary" id="btnAddWeight">Добавить вес</button>
+      </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Веса сортируются по возрастанию. “60-50” ставится по максимальному числу (60).
+      </div>
+    </div>
 
-одиночество человека, который знает больше других.
+    <div class="section">
+      <h3>Управление</h3>
+      <div class="field">
+        <label>Упражнение</label>
+        <select id="selManageExercise"></select>
+      </div>
 
-Что особенно сильно (и это стоит беречь)
+      <div class="toggleLine" style="margin-top:0">
+        <div class="left">
+          <span class="badge">L/R</span>
+          <div>
+            <b style="display:block">Split L/R</b>
+            <small style="color:var(--muted)">Раздельный ввод</small>
+          </div>
+        </div>
+        <button class="btn" id="btnToggleSplit">Переключить</button>
+      </div>
 
-Фланкеры как последние вспышки
-Каждый аромат — последний. Это невероятно точная метафора памяти, искусства и старения. Тут почти готовая философия:
+      <div class="toggleLine">
+        <div class="left">
+          <span class="badge">🗄️</span>
+          <div>
+            <b style="display:block">Архив</b>
+            <small style="color:var(--muted)">Скрыть упражнение (не удалять)</small>
+          </div>
+        </div>
+        <button class="btn" id="btnToggleArchive">Переключить</button>
+      </div>
 
-мы чувствуем по-настоящему только тогда, когда знаем, что это — в последний раз.
+      <div style="margin-top:10px">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px">Веса (показ/скрыть)</div>
+        <div id="weightsList"></div>
+      </div>
 
-Он не меняет мир глобально
-Он не спасает человечество.
-Он спасает одного человека за раз.
-Это делает книгу человечной и правдивой.
+      <div style="margin-top:12px" class="rowActions">
+        <button class="btn danger" id="btnDeleteExercise">Удалить навсегда…</button>
+      </div>
+      <div style="margin-top:6px; color:var(--muted); font-size:12px">
+        Удаление уничтожает историю. Архив обычно лучше.
+      </div>
+    </div>
 
-Завещание как передача дара
-Очень хорошая рамка. Не финал, а эстафета. Книга не «закрывается», а продолжает дышать за пределами текста.
+    <div class="section">
+      <h3>Данные</h3>
+      <div class="rowActions">
+        <button class="btn" id="btnExport">Экспорт JSON</button>
+        <button class="btn" id="btnImport">Импорт JSON</button>
+        <button class="btn danger" id="btnReset">Сброс (seed)</button>
+      </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Всё хранится в LocalStorage. Импорт перезаписывает данные.
+      </div>
+    </div>
+  </div>
+</aside>
 
-Потенциальные риски (и как их обойти)
+<div class="modalOverlay" id="cellModalOverlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Редактор">
+    <header>
+      <div>
+        <b id="cellTitle">Ячейка</b><br/>
+        <small id="cellSubtitle" style="color:var(--muted)"></small>
+      </div>
+      <button class="btn icon" id="btnCloseCellModal" aria-label="Закрыть">✕</button>
+    </header>
+    <main>
+      <div class="sets" id="setsWrap"></div>
+      <div class="rowActions">
+        <button class="btn" id="btnAddSet">+ сет</button>
+        <button class="btn" id="btnClearSets">Очистить</button>
+      </div>
 
-Скажу честно, как редактор:
+      <div class="toggleLine">
+        <div class="left">
+          <span class="badge">🩹</span>
+          <div>
+            <b style="display:block">Травма</b>
+            <small style="color:var(--muted)">Розовый фон, но статусная обводка сохраняется</small>
+          </div>
+        </div>
+        <button class="btn" id="btnToggleInjury">Выкл</button>
+      </div>
+    </main>
+    <footer>
+      <button class="btn" id="btnCancelCell">Отмена</button>
+      <button class="btn primary" id="btnSaveCell">Сохранить</button>
+    </footer>
+  </div>
+</div>
 
-Опасность однообразия структуры
-Если все истории будут слишком одинаковыми, читатель устанет.
-Решение:
-иногда ломать структуру,
-иногда пропускать этап,
-иногда давать «неудачный фланкер».
+<div class="modalOverlay" id="infoModalOverlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Инфо">
+    <header>
+      <b id="infoTitle">Инфо</b>
+      <button class="btn icon" id="btnCloseInfoModal" aria-label="Закрыть">✕</button>
+    </header>
+    <main id="infoBody"></main>
+    <footer>
+      <button class="btn primary" id="btnCloseInfoModal2">Ок</button>
+    </footer>
+  </div>
+</div>
 
-Слишком идеальные изменения судеб
-Лучше, если не всегда «к лучшему» в бытовом смысле.
-Иногда — к честности, расставанию, утрате иллюзий. Это усилит доверие.
+<script>
+/* ===========================
+   Константы + утилиты
+=========================== */
+const LS_KEY = "gymProgress.v1";
+const DEFAULT_BLOCKS = ["ГРУДЬ","БИЦЕПС","СПИНА","ДЕЛЬТЫ","НОГИ"];
 
-Излишняя парфюмерная детализация
-Пирамида аромата — классно, но важно, чтобы она работала как поэзия, а не как каталог.
+const STATUS = {
+  RECORD: "record",
+  NEW_WEIGHT: "new_weight",
+  NEW_EX: "new_ex",
+  NOT_RECORD: "not_record",
+};
 
-Итоговое мнение
+const nowId = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
 
-Это:
+/* Для обычных весов — число повторов.
+   Для "лесенки" типа "60-50" — строка повторов "15-7" (то же число сегментов). */
+const clampInt = (v) => {
+  const n = parseInt(String(v||"").trim(), 10);
+  return Number.isFinite(n) && n>=0 ? n : null;
+};
 
-оригинальная идея с высокой литературной потенцией;
+function parseDDMMYYYY(s){
+  if(!s) return null;
+  const m = String(s).trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(!m) return null;
+  const dd = +m[1], mm = +m[2], yyyy = +m[3];
+  const d = new Date(yyyy, mm-1, dd);
+  if(d.getFullYear()!==yyyy || (d.getMonth()+1)!==mm || d.getDate()!==dd) return null;
+  return d;
+}
+function fmtDate(d){
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yy = d.getFullYear();
+  return `${dd}.${mm}.${yy}`;
+}
+function sortWorkoutsAsc(workouts){
+  return [...workouts].sort((a,b)=>{
+    const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+    const ta = da?da.getTime():0, tb = db?db.getTime():0;
+    return ta-tb;
+  });
+}
+// отображение: свежая слева
+function sortWorkoutsDesc(workouts){
+  return [...workouts].sort((a,b)=>{
+    const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+    const ta = da?da.getTime():0, tb = db?db.getTime():0;
+    return tb-ta;
+  });
+}
 
-книга, которая может стать «тихим культом»;
+/* Вес: сортировка по максимальному числу из строки. */
+function weightMaxNumber(label){
+  const s = String(label||"").trim();
+  const nums = s.match(/(\d+(?:[.,]\d+)?)/g);
+  if(!nums) return Number.POSITIVE_INFINITY;
+  let max = -Infinity;
+  for(const t of nums){
+    const n = parseFloat(t.replace(",","."));
+    if(Number.isFinite(n)) max = Math.max(max,n);
+  }
+  return Number.isFinite(max) ? max : Number.POSITIVE_INFINITY;
+}
 
-текст, который будут советовать не всем, а нужным людям — а это самый ценный путь.
+/* "60-50-40" -> 3 (сегмента). Если не похоже на лесенку — 1 */
+function weightStepsFromLabel(weightLabel){
+  const s = String(weightLabel||"").trim();
+  if(!s.includes("-")) return 1;
+  const parts = s.split("-").map(x=>x.trim()).filter(Boolean);
+  if(parts.length < 2) return 1;
+  const ok = parts.every(p => /(\d+(?:[.,]\d+)?)/.test(p));
+  return ok ? parts.length : 1;
+}
 
-При хорошем языке и дисциплине формы это может быть именно та книга, о которой говорят:
+/* Парс повторов:
+   steps=1 -> число (int)
+   steps>1 -> строка "15-7-4" с ровно steps сегментами (int >=0) */
+function parseRepsValue(raw, steps){
+  const s = String(raw ?? "").trim();
+  if(!s) return null;
+  if(steps<=1){
+    return clampInt(s);
+  }
+  const parts = s.split("-").map(x=>x.trim()).filter(x=>x.length>0);
+  if(parts.length !== steps) return null;
+  const nums = parts.map(clampInt);
+  if(nums.some(n=>n==null)) return null;
+  return nums.join("-");
+}
 
-«Я не знаю, почему, но после неё хочется жить чуть внимательнее».
+/* Для лесенки: "15-7-4" -> parts и т.д. */
+function repsMeta(val, steps){
+  if(steps<=1){
+    const n = (typeof val === "number") ? val : clampInt(val);
+    if(n==null) return null;
+    return {parts:[n], prefixKey:"", last:n, str:String(n)};
+  }
+  if(typeof val !== "string") return null;
+  const parts = val.split("-").map(x=>clampInt(x.trim()));
+  if(parts.length !== steps) return null;
+  if(parts.some(n=>n==null)) return null;
+  const last = parts[parts.length-1];
+  const prefixKey = parts.slice(0,-1).join("-");
+  return {parts, prefixKey, last, str: parts.join("-")};
+}
 
-Если развивать дальше, следующий логичный шаг — разговор не о рынке, а о тональности языка героя: насколько он усталый, насколько ироничный, насколько отстранённый. Это будет решать всё.<script>
+/* ===========================
+   Модель данных
+=========================== */
+function seedState(){
+  const mkW = (label) => ({id: nowId(), label, hidden:false});
+  const mkE = (name, weights, splitLR=false) => ({
+    id: nowId(), name, archived:false, splitLR,
+    weights: weights.map(mkW)
+  });
+  const mkB = (name, exs) => ({id: nowId(), name, collapsed:false, exercises: exs});
+
+  const w1 = {id: nowId(), date:"02.01.2026"};
+  const w2 = {id: nowId(), date:"05.01.2026"};
+  const w3 = {id: nowId(), date:"06.01.2026"};
+
+  const chest = mkB("ГРУДЬ", [
+    mkE("жим лёжа", ["40","50","60-50"]),
+    mkE("разводка", ["10","12.5"])
+  ]);
+  const biceps = mkB("БИЦЕПС", [
+    mkE("подъём на бицепс", ["10","12.5"], true)
+  ]);
+  const back = mkB("СПИНА", [
+    mkE("тяга в наклоне", ["40","50"])
+  ]);
+  const delts = mkB("ДЕЛЬТЫ", [
+    mkE("жим стоя", ["20","25"])
+  ]);
+  const legs = mkB("НОГИ", [
+    mkE("присед", ["40","60"])
+  ]);
+
+  const state = {
+    theme: "light",
+    blocks: [chest,biceps,back,delts,legs],
+    workouts: [w1,w2,w3],
+    entries: {}
+  };
+
+  const exBench = chest.exercises[0];
+  const w40 = exBench.weights.find(x=>x.label==="40").id;
+  const w50 = exBench.weights.find(x=>x.label==="50").id;
+
+  state.entries[w1.id] = {
+    [exBench.id]: {
+      [w40]: {sets:[10,10], injury:false},
+      [w50]: {sets:[8,8], injury:false}
+    }
+  };
+  state.entries[w2.id] = {
+    [exBench.id]: {
+      [w40]: {sets:[11,10], injury:false},
+      [w50]: {sets:[8,8,7], injury:false}
+    }
+  };
+
+  const exCurl = biceps.exercises[0];
+  const w10 = exCurl.weights.find(x=>x.label==="10").id;
+  state.entries[w2.id][exCurl.id] = {
+    [w10]: {
+      L:{sets:[10,10], injury:false},
+      R:{sets:[10,9], injury:false}
+    }
+  };
+
+  state.workouts = sortWorkoutsAsc(state.workouts);
+  for(const b of state.blocks){
+    for(const e of b.exercises){
+      e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+    }
+  }
+  return state;
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return seedState();
+    const st = JSON.parse(raw);
+    if(!st || !Array.isArray(st.blocks) || !Array.isArray(st.workouts) || typeof st.entries!=="object"){
+      return seedState();
+    }
+    st.workouts = sortWorkoutsAsc(st.workouts);
+    st.theme = st.theme==="dark" ? "dark" : "light";
+    for(const b of st.blocks){
+      b.collapsed = !!b.collapsed;
+      b.exercises = b.exercises || [];
+      for(const e of b.exercises){
+        e.archived = !!e.archived;
+        e.splitLR = !!e.splitLR;
+        e.weights = e.weights || [];
+        for(const w of e.weights) w.hidden = !!w.hidden;
+        e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+      }
+    }
+    return st;
+  }catch(e){
+    console.warn("loadState failed", e);
+    return seedState();
+  }
+}
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+/* ===========================
+   Глобальный state
+=========================== */
+let state = loadState();
+
+/* ===========================
+   DOM refs
+=========================== */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+const tableWrap = $("#tableWrap");
+const subTitle = $("#subTitle");
+
+const viewTable = $("#viewTable");
+const viewAnalytics = $("#viewAnalytics");
+const tabTable = $("#tabTable");
+const tabAnalytics = $("#tabAnalytics");
+
+const overlay = $("#overlay");
+const drawer = $("#drawer");
+
+const cellModalOverlay = $("#cellModalOverlay");
+const infoModalOverlay = $("#infoModalOverlay");
+
+const anBlock = $("#anBlock");
+const anExercise = $("#anExercise");
+const anMetric = $("#anMetric");
+const chart = $("#chart");
+const kpiRow = $("#kpiRow");
+const insights = $("#insights");
+
+/* ===========================
+   Роутинг вкладок
+=========================== */
+function setTab(name){
+  const isTable = name==="table";
+  viewTable.classList.toggle("active", isTable);
+  viewAnalytics.classList.toggle("active", !isTable);
+
+  tabTable.classList.toggle("active", isTable);
+  tabAnalytics.classList.toggle("active", !isTable);
+  tabTable.setAttribute("aria-selected", String(isTable));
+  tabAnalytics.setAttribute("aria-selected", String(!isTable));
+
+  subTitle.textContent = isTable ? "offline • таблица" : "offline • аналитика";
+  if(!isTable) renderAnalytics();
+}
+tabTable.addEventListener("click", ()=>setTab("table"));
+tabAnalytics.addEventListener("click", ()=>setTab("analytics"));
+
+/* ===========================
+   Тема
+=========================== */
+function applyTheme(){
+  document.documentElement.dataset.theme = state.theme === "dark" ? "dark" : "light";
+}
+applyTheme();
+
+/* ===========================
+   Открыть/закрыть drawer
+=========================== */
+function openDrawer(){
+  overlay.classList.add("show");
+  drawer.classList.add("show");
+  refreshMenuSelects();
+}
+function closeDrawer(){
+  overlay.classList.remove("show");
+  drawer.classList.remove("show");
+}
+$("#btnMenu").addEventListener("click", openDrawer);
+$("#btnCloseDrawer").addEventListener("click", closeDrawer);
+overlay.addEventListener("click", closeDrawer);
+
+/* ===========================
+   Хелп (легенда)
+=========================== */
+function showInfo(title, html){
+  $("#infoTitle").textContent = title;
+  $("#infoBody").innerHTML = html;
+  infoModalOverlay.classList.add("show");
+  infoModalOverlay.setAttribute("aria-hidden","false");
+}
+function closeInfo(){
+  infoModalOverlay.classList.remove("show");
+  infoModalOverlay.setAttribute("aria-hidden","true");
+}
+$("#btnHelp").addEventListener("click", ()=>{
+  showInfo("Легенда цветов", `
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div class="legendLine">
+        <span class="dot gold"></span><b>Рекорд</b><span style="color:var(--muted)">— золотая обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot green"></span><b>Новый вес</b><span style="color:var(--muted)">— зелёная обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot yellow"></span><b>Первый раз упражнение</b><span style="color:var(--muted)">— жёлтая обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot gray"></span><b>Не рекорд</b><span style="color:var(--muted)">— серый фон (когда были прошлые данные)</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot pink"></span><b>Травма</b><span style="color:var(--muted)">— розовый фон (обводка статуса сохраняется)</span>
+      </div>
+      <hr style="border:none; border-top:1px solid var(--line)">
+      <div style="color:var(--muted); font-size:12px">
+        <b>Цель “надо X”</b> показывается только в пустых ячейках самой свежей тренировки (по дате), если уже есть история по этому упражнению+весу.
+      </div>
+    </div>
+  `);
+});
+$("#btnCloseInfoModal").addEventListener("click", closeInfo);
+$("#btnCloseInfoModal2").addEventListener("click", closeInfo);
+
+/* ===========================
+   Меню: тема + экспорт/импорт/reset
+=========================== */
+$("#btnTheme").addEventListener("click", ()=>{
+  state.theme = (state.theme==="dark") ? "light" : "dark";
+  applyTheme();
+  saveState();
+});
+$("#btnExport").addEventListener("click", ()=>{
+  const json = JSON.stringify(state, null, 2);
+  showInfo("Экспорт JSON", `
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div style="color:var(--muted); font-size:12px">Скопируй и сохрани где-нибудь. Это твой бэкап.</div>
+      <textarea id="exportArea" style="width:100%; height:260px; padding:10px; border-radius:14px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px"></textarea>
+      <div class="rowActions">
+        <button class="btn primary" id="btnCopyExport">Скопировать</button>
+      </div>
+    </div>
+  `);
+  setTimeout(()=>{
+    const ta = $("#exportArea");
+    if(ta){ ta.value = json; ta.focus(); ta.select(); }
+    const btn = $("#btnCopyExport");
+    if(btn){
+      btn.addEventListener("click", ()=>{
+        ta.select();
+        document.execCommand("copy");
+        btn.textContent = "Скопировано ✓";
+        setTimeout(()=>btn.textContent="Скопировать", 1200);
+      });
+    }
+  },0);
+});
+$("#btnImport").addEventListener("click", ()=>{
+  showInfo("Импорт JSON", `
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div style="color:var(--muted); font-size:12px">
+        Вставь JSON. Импорт <b>перезапишет</b> текущие данные.
+      </div>
+      <textarea id="importArea" style="width:100%; height:260px; padding:10px; border-radius:14px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px"></textarea>
+      <div class="rowActions">
+        <button class="btn danger" id="btnDoImport">Импортировать</button>
+      </div>
+    </div>
+  `);
+  setTimeout(()=>{
+    const btn = $("#btnDoImport");
+    const ta = $("#importArea");
+    if(btn && ta){
+      btn.addEventListener("click", ()=>{
+        try{
+          const obj = JSON.parse(ta.value);
+          localStorage.setItem(LS_KEY, JSON.stringify(obj));
+          state = loadState();
+          applyTheme();
+          renderAll();
+          closeInfo();
+          closeDrawer();
+        }catch(e){
+          alert("Не удалось импортировать: проверь JSON.");
+        }
+      });
+    }
+  },0);
+});
+$("#btnReset").addEventListener("click", ()=>{
+  if(confirm("Сбросить всё и загрузить seed-данные?")){
+    state = seedState();
+    applyTheme();
+    saveState();
+    renderAll();
+    closeDrawer();
+  }
+});
+
+/* ===========================
+   Дальше — часть 2
+=========================== */
+</script>
+<script>
 /* ===========================
    Поиск сущностей
 =========================== */
