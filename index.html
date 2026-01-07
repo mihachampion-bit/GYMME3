@@ -115,7 +115,7 @@
       border-spacing: 0;
       width:max-content;
       min-width: 100%;
-      position: relative; /* помогает sticky внутри */
+      position: relative;
     }
     th, td{
       border-bottom: 1px solid var(--line);
@@ -127,7 +127,7 @@
       white-space: nowrap;
     }
 
-    /* закрепление строки заголовка (дат) */
+    /* закрепление заголовка тренировок */
     thead{
       position: sticky;
       top: 0;
@@ -135,7 +135,7 @@
       background: var(--stickyBg);
       backdrop-filter: blur(10px);
     }
-    thead tr{background: var(--stickyBg)}
+    thead tr{ background: var(--stickyBg); }
     thead th{
       position: sticky;
       top: 0;
@@ -200,23 +200,23 @@
     }
 
     /* перенос названий упражнений */
-    .exRow td{ height:auto; white-space: normal; }
-    .exRow .stickyLeft{ white-space: normal; }
+    .exRow td{ height:auto; white-space:normal; }
+    .exRow .stickyLeft{ white-space:normal; }
     .exRow .leftText{
-      white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
-      word-break: break-word;
+      white-space:normal;
+      overflow:visible;
+      text-overflow:clip;
+      word-break:break-word;
     }
 
-    /* перенос ВЕСОВ */
-    .wRow td{ height:auto; white-space: normal; }
-    .wRow .stickyLeft{ white-space: normal; }
+    /* перенос весов */
+    .wRow td{ height:auto; white-space:normal; }
+    .wRow .stickyLeft{ white-space:normal; }
     .wRow .leftText{
-      white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
-      word-break: break-word;
+      white-space:normal;
+      overflow:visible;
+      text-overflow:clip;
+      word-break:break-word;
     }
 
     .tinyIcon{
@@ -367,9 +367,7 @@
       display:flex; gap:8px; align-items:center;
     }
     .setRow input{flex:1}
-    .setRow button{
-      width: 42px;
-    }
+    .setRow button{ width: 42px; }
     .toggleLine{
       display:flex; align-items:center; justify-content:space-between;
       padding: 10px;
@@ -428,9 +426,7 @@
     .dot.yellow{border-color: var(--yellow)}
     .dot.gray{background: var(--grayFill); border-color: var(--line)}
     .dot.pink{background: var(--injuryFill); border-color: var(--line)}
-    .helpLink{
-      text-decoration:none; color: var(--accent); font-weight:700;
-    }
+    .helpLink{ text-decoration:none; color: var(--accent); font-weight:700; }
 
     @media (max-width: 380px){
       :root{ --leftW: 120px; --rowH: 42px; }
@@ -512,7 +508,6 @@
   </div>
 </div>
 
-<!-- Drawer -->
 <div class="overlay" id="overlay"></div>
 <aside class="drawer" id="drawer" aria-label="Меню">
   <header>
@@ -628,7 +623,6 @@
   </div>
 </aside>
 
-<!-- Cell editor modal -->
 <div class="modalOverlay" id="cellModalOverlay" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-label="Редактор">
     <header>
@@ -663,7 +657,6 @@
   </div>
 </div>
 
-<!-- Stats / Help modal (shared) -->
 <div class="modalOverlay" id="infoModalOverlay" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-label="Инфо">
     <header>
@@ -728,7 +721,6 @@ function sortWorkoutsDesc(workouts){
   });
 }
 
-/* Вес: сортировка по максимальному числу из строки. */
 function weightMaxNumber(label){
   const s = String(label||"").trim();
   const nums = s.match(/(\d+(?:[.,]\d+)?)/g);
@@ -741,7 +733,6 @@ function weightMaxNumber(label){
   return Number.isFinite(max) ? max : Number.POSITIVE_INFINITY;
 }
 
-/* "60-50-40" -> 3 сегмента. Если не похоже на лесенку — 1 */
 function weightStepsFromLabel(weightLabel){
   const s = String(weightLabel||"").trim();
   if(!s.includes("-")) return 1;
@@ -751,9 +742,6 @@ function weightStepsFromLabel(weightLabel){
   return ok ? parts.length : 1;
 }
 
-/* Парс повторов:
-   steps=1 -> число
-   steps>1 -> строка "15-7-4" с ровно steps сегментами */
 function parseRepsValue(raw, steps){
   const s = String(raw ?? "").trim();
   if(!s) return null;
@@ -767,7 +755,6 @@ function parseRepsValue(raw, steps){
   return nums.join("-");
 }
 
-/* Для лесенки: разбор "15-7-4" */
 function repsMeta(val, steps){
   if(steps<=1){
     const n = (typeof val === "number") ? val : clampInt(val);
@@ -783,53 +770,9 @@ function repsMeta(val, steps){
   return {parts, prefixKey, last, str: parts.join("-")};
 }
 
-function sumNumericPartsFromSetVal(setVal, steps){
-  const meta = repsMeta(setVal, steps);
-  if(!meta) return 0;
-  return meta.parts.reduce((a,b)=>a+(b||0),0);
-}
-function lastPartFromSetVal(setVal, steps){
-  const meta = repsMeta(setVal, steps);
-  return meta ? meta.last : null;
-}
-function normalizeSetDisplay(setVal, steps){
-  const meta = repsMeta(setVal, steps);
-  return meta ? meta.str : "";
-}
-function firstPartFromSetVal(setVal, steps){
-  const meta = repsMeta(setVal, steps);
-  if(!meta) return null;
-  return meta.parts[0] ?? null;
-}
-
 /* ===========================
    Модель данных
 =========================== */
-/*
-state = {
-  theme: "light"|"dark",
-  blocks: [
-    {id,name,collapsed:false, exercises:[
-      {id,name, archived:false, splitLR:false, weights:[
-        {id,label, hidden:false}
-      ]}
-    ]}
-  ],
-  workouts: [{id,date}],
-  entries: {
-    [workoutId]: {
-      [exerciseId]: {
-        [weightId]: {
-          // splitLR=false:
-          sets:[number|string], injury:boolean
-          // splitLR=true:
-          L:{sets:[number|string], injury:boolean}, R:{sets:[number|string], injury:boolean}
-        }
-      }
-    }
-  }
-}
-*/
 function seedState(){
   const mkW = (label) => ({id: nowId(), label, hidden:false});
   const mkE = (name, weights, splitLR=false) => ({
@@ -859,49 +802,46 @@ function seedState(){
     mkE("присед", ["40","60"])
   ]);
 
-  const st = {
+  const state = {
     theme: "light",
     blocks: [chest,biceps,back,delts,legs],
     workouts: [w1,w2,w3],
     entries: {}
   };
 
-  // примеры введённых данных
   const exBench = chest.exercises[0];
   const w40 = exBench.weights.find(x=>x.label==="40").id;
   const w50 = exBench.weights.find(x=>x.label==="50").id;
-  const w6050 = exBench.weights.find(x=>x.label==="60-50").id;
 
-  st.entries[w1.id] = {
+  state.entries[w1.id] = {
     [exBench.id]: {
       [w40]: {sets:[10,10], injury:false},
       [w50]: {sets:[8,8], injury:false}
     }
   };
-  st.entries[w2.id] = {
+  state.entries[w2.id] = {
     [exBench.id]: {
       [w40]: {sets:[11,10], injury:false},
-      [w50]: {sets:[8,8,7], injury:false},
-      [w6050]: {sets:["15-5"], injury:false}
+      [w50]: {sets:[8,8,7], injury:false}
     }
   };
 
   const exCurl = biceps.exercises[0];
   const w10 = exCurl.weights.find(x=>x.label==="10").id;
-  st.entries[w2.id][exCurl.id] = {
+  state.entries[w2.id][exCurl.id] = {
     [w10]: {
       L:{sets:[10,10], injury:false},
       R:{sets:[10,9], injury:false}
     }
   };
 
-  st.workouts = sortWorkoutsAsc(st.workouts);
-  for(const b of st.blocks){
+  state.workouts = sortWorkoutsAsc(state.workouts);
+  for(const b of state.blocks){
     for(const e of b.exercises){
       e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
     }
   }
-  return st;
+  return state;
 }
 
 function loadState(){
@@ -935,9 +875,6 @@ function saveState(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
 }
 
-/* ===========================
-   Глобальный state
-=========================== */
 let state = loadState();
 
 /* ===========================
@@ -1180,13 +1117,25 @@ function setCellEntry(workoutId, exId, wId, entry){
 }
 
 /* ===========================
-   Повторы/сеты helpers
+   Повторы: helpers
+=========================== */
+function sumNumericPartsFromSetVal(setVal, steps){
+  const meta = repsMeta(setVal, steps);
+  if(!meta) return 0;
+  return meta.parts.reduce((a,b)=>a+(b||0),0);
+}
+function firstPartFromSetVal(setVal, steps){
+  const meta = repsMeta(setVal, steps);
+  if(!meta) return null;
+  return meta.parts[0] ?? null;
+}
+
+/* ===========================
+   Entries вычисления
 =========================== */
 function entryTotalReps(entry, splitLR, side, steps){
   if(!entry) return 0;
-  const sets = (!splitLR)
-    ? (entry.sets||[])
-    : ((entry[side]?.sets)||[]);
+  const sets = (!splitLR) ? (entry.sets||[]) : ((entry[side]?.sets)||[]);
   return (sets||[]).reduce((a,sv)=>a + sumNumericPartsFromSetVal(sv, steps), 0);
 }
 function entrySetsCount(entry, splitLR, side){
@@ -1206,13 +1155,12 @@ function entryInjury(entry, splitLR, side){
 }
 
 /* ===========================
-   Хронология + индексы
+   Статусы (как было)
 =========================== */
 function buildChronoIndex(){
   const workouts = sortWorkoutsAsc(state.workouts);
   const wOrder = workouts.map(w=>w.id);
 
-  // history[exId][wId][side] = [{workoutId,total,hasData,injury,bestLastByPrefix,steps}]
   const history = {};
   for(const wid of wOrder){
     const wEntries = state.entries[wid] || {};
@@ -1222,37 +1170,35 @@ function buildChronoIndex(){
       for(const wId of Object.keys(weightsMap)){
         const fe = findExercise(exId);
         if(!fe) continue;
+        const fw = findWeight(exId, wId);
+        const steps = weightStepsFromLabel(fw?.w?.label);
 
         const entry = weightsMap[wId];
         history[exId][wId] ||= { N: [], L: [], R: [] };
 
-        const fw = findWeight(exId, wId);
-        const steps = weightStepsFromLabel(fw?.w?.label);
-
-        const collectSide = (sideKey)=>{
+        const pushSide = (sideKey)=>{
           const split = fe.ex.splitLR;
           const has = entryHasData(entry, split, sideKey==="N"?null:sideKey);
           const injury = entryInjury(entry, split, sideKey==="N"?null:sideKey);
           const total = entryTotalReps(entry, split, sideKey==="N"?null:sideKey, steps);
 
-          const bestLastByPrefix = {};
+          const firstParts = new Set();
           if(has && steps>1){
             const sets = (!split) ? (entry.sets||[]) : ((entry[sideKey]?.sets)||[]);
             for(const sv of sets){
-              const meta = repsMeta(sv, steps);
-              if(!meta) continue;
-              const key = meta.prefixKey;
-              bestLastByPrefix[key] = Math.max(bestLastByPrefix[key] ?? -Infinity, meta.last);
+              const fp = firstPartFromSetVal(sv, steps);
+              if(fp!=null) firstParts.add(fp);
             }
           }
-          return {workoutId: wid, total, hasData: has, injury, bestLastByPrefix, steps};
+
+          return {workoutId: wid, hasData: has, injury, total, steps, firstParts};
         };
 
         if(!fe.ex.splitLR){
-          history[exId][wId].N.push(collectSide("N"));
+          history[exId][wId].N.push(pushSide("N"));
         }else{
-          history[exId][wId].L.push(collectSide("L"));
-          history[exId][wId].R.push(collectSide("R"));
+          history[exId][wId].L.push(pushSide("L"));
+          history[exId][wId].R.push(pushSide("R"));
         }
       }
     }
@@ -1261,66 +1207,113 @@ function buildChronoIndex(){
   return {workouts, wOrder, history};
 }
 
-/* предыдущие рекорды (лесенка: prefix -> maxLast; обычный: "" -> maxTotal) */
-function prevBestLastMap(chrono, workoutId, exId, wId, sideKey, steps){
-  const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
-  const map = {};
-  for(const it of seq){
-    if(it.workoutId === workoutId) break;
-    if(!it.hasData) continue;
-    if(steps<=1){
-      map[""] = Math.max(map[""] ?? -Infinity, it.total);
-    }else{
-      for(const [k,v] of Object.entries(it.bestLastByPrefix || {})){
-        map[k] = Math.max(map[k] ?? -Infinity, v);
-      }
-    }
-  }
-  return map;
-}
-
-/* NEW: для лесенок “новый вес” = новый первый повтор (первое число) */
-function prevFirstPartsSet(chrono, workoutId, exId, wId, sideKey, steps){
+function prevFirstPartsSet(chrono, workoutId, exId, wId, sideKey){
   const set = new Set();
-  if(steps<=1) return set;
   const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
   for(const it of seq){
     if(it.workoutId === workoutId) break;
     if(!it.hasData) continue;
-
-    const entry = getCellEntry(it.workoutId, exId, wId);
-    if(!entry) continue;
-    const fe = findExercise(exId);
-    if(!fe) continue;
-    const split = fe.ex.splitLR;
-    const sets = (!split) ? (entry.sets||[]) : ((entry[sideKey]?.sets)||[]);
-    for(const sv of (sets||[])){
-      const fp = firstPartFromSetVal(sv, steps);
-      if(fp!=null) set.add(fp);
-    }
-  }
-  return set;
-}
-function currentFirstPartsSet(entry, splitLR, sideKey, steps){
-  const set = new Set();
-  if(!entry || steps<=1) return set;
-  const sets = (!splitLR) ? (entry.sets||[]) : ((entry[sideKey]?.sets)||[]);
-  for(const sv of (sets||[])){
-    const fp = firstPartFromSetVal(sv, steps);
-    if(fp!=null) set.add(fp);
+    for(const v of (it.firstParts||[])) set.add(v);
   }
   return set;
 }
 
-/* цель для пустой ячейки (только в самой свежей тренировке — это ограничивается в renderWeightRow) */
-function goalForEmptyCell(chrono, workoutId, exId, wId, sideKey){
+function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
+  const fe = findExercise(exId);
+  if(!fe) return {border:null, gray:false, injury:false, isRecord:false, isNewWeight:false, isNewEx:false};
+
   const fw = findWeight(exId, wId);
   const steps = weightStepsFromLabel(fw?.w?.label);
 
+  const split = fe.ex.splitLR;
+  const entry = getCellEntry(workoutId, exId, wId);
+  const has = entryHasData(entry, split, sideKey==="N"?null:sideKey);
+  const injury = entryInjury(entry, split, sideKey==="N"?null:sideKey);
+
+  // рекорд: как было — по total (сумме частей) для простоты
+  const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
+  let maxPrev = -Infinity;
+  let hadPrev = false;
+  for(const it of seq){
+    if(it.workoutId === workoutId) break;
+    if(it.hasData){
+      hadPrev = true;
+      maxPrev = Math.max(maxPrev, it.total);
+    }
+  }
+  const total = entryTotalReps(entry, split, sideKey==="N"?null:sideKey, steps);
+  const isRecord = has && hadPrev && (total > maxPrev);
+
+  // новый вес:
+  //  - обычный вес: первое появление данных на этом weightId
+  //  - лесенка: если появился новый первый повтор (первая часть "15-7" => 15)
+  let isNewWeight = false;
+  if(has){
+    if(steps<=1){
+      let seenBefore = false;
+      for(const it of seq){
+        if(it.workoutId === workoutId) break;
+        if(it.hasData){ seenBefore = true; break; }
+      }
+      isNewWeight = !seenBefore;
+    }else{
+      const prevSet = prevFirstPartsSet(chrono, workoutId, exId, wId, sideKey);
+      const setsNow = (!split) ? (entry?.sets||[]) : ((entry?.[sideKey]?.sets)||[]);
+      let foundNewFirst = false;
+      for(const sv of setsNow){
+        const fp = firstPartFromSetVal(sv, steps);
+        if(fp!=null && !prevSet.has(fp)){ foundNewFirst = true; break; }
+      }
+      isNewWeight = foundNewFirst;
+    }
+  }
+
+  // новое упражнение: первое появление любых данных по упражнению
+  let isNewEx = false;
+  if(has){
+    let anyBefore = false;
+    for(const wid of chrono.wOrder){
+      if(wid === workoutId) break;
+      const exMap = (state.entries[wid]||{})[exId] || null;
+      if(!exMap) continue;
+      for(const wKey of Object.keys(exMap)){
+        const ent = exMap[wKey];
+        if(!split){
+          if(entryHasData(ent,false,null)){ anyBefore = true; break; }
+        }else{
+          if(entryHasData(ent,true,"L") || entryHasData(ent,true,"R")){ anyBefore = true; break; }
+        }
+      }
+      if(anyBefore) break;
+    }
+    isNewEx = !anyBefore;
+  }
+
+  const gray = has && hadPrev && !isRecord;
+
+  let border = null;
+  if(isRecord) border = "gold";
+  else if(isNewWeight) border = "green";
+  else if(isNewEx) border = "yellow";
+
+  return {border, gray, injury, isRecord, isNewWeight, isNewEx};
+}
+
+/* ===========================
+   Цели (как было в твоей версии — только в самой свежей тренировке)
+=========================== */
+function goalForEmptyCell(chrono, workoutId, exId, wId, sideKey){
+  const newest = sortWorkoutsAsc(state.workouts).at(-1)?.id;
+  if(newest !== workoutId) return null;
+
+  const fw = findWeight(exId, wId);
+  const steps = weightStepsFromLabel(fw?.w?.label);
+
+  const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
+  let hasPrev = false;
+
   if(steps<=1){
-    const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
     let maxPrev = -Infinity;
-    let hasPrev = false;
     for(const it of seq){
       if(it.workoutId === workoutId) break;
       if(it.hasData){
@@ -1332,124 +1325,35 @@ function goalForEmptyCell(chrono, workoutId, exId, wId, sideKey){
     return (maxPrev + 1);
   }
 
-  const prevMap = prevBestLastMap(chrono, workoutId, exId, wId, sideKey, steps);
-  const keys = Object.keys(prevMap);
-  if(keys.length===0) return null;
-
-  const variants = keys
-    .sort()
-    .map(k => `${k ? (k + "-") : ""}${(prevMap[k] + 1)}`)
-    .join(" или ");
-
-  return variants;
-}
-
-function isRecordForLadder(chrono, workoutId, exId, wId, sideKey, entry, steps){
-  // рекорд по лесенке: любой сет, где last > prevBestLast(prefix)
-  const prevMap = prevBestLastMap(chrono, workoutId, exId, wId, sideKey, steps);
-  const fe = findExercise(exId);
-  if(!fe) return false;
-  const split = fe.ex.splitLR;
-  const sets = (!split) ? (entry.sets||[]) : ((entry[sideKey]?.sets)||[]);
-  for(const sv of sets){
-    const meta = repsMeta(sv, steps);
-    if(!meta) continue;
-    const prev = prevMap[meta.prefixKey];
-    if(prev!=null && meta.last > prev) return true;
-  }
-  return false;
-}
-
-function computeCellStatus(chrono, workoutId, exId, wId, sideKey){
-  const fe = findExercise(exId);
-  if(!fe) return {border:null, gray:false, injury:false, isRecord:false, isNewWeight:false, isNewEx:false};
-  const split = fe.ex.splitLR;
-
-  const fw = findWeight(exId, wId);
-  const steps = weightStepsFromLabel(fw?.w?.label);
-
-  const entry = getCellEntry(workoutId, exId, wId);
-  const has = entryHasData(entry, split, sideKey==="N"?null:sideKey);
-  const injury = entryInjury(entry, split, sideKey==="N"?null:sideKey);
-
-  // определить: был ли этот вес раньше (любые данные)
-  const seq = ((chrono.history[exId]||{})[wId]||{})[sideKey] || [];
-  let hadPrevDataForThisWeight = false;
+  // лесенка: цель по последней части (prefix -> last+1), выводим варианты "a-b+1 или c-d+1"
+  const prevMap = new Map(); // prefix => bestLast
   for(const it of seq){
     if(it.workoutId === workoutId) break;
-    if(it.hasData){ hadPrevDataForThisWeight = true; break; }
-  }
+    if(!it.hasData) continue;
 
-  // рекорд
-  let isRecord = false;
-  if(has && hadPrevDataForThisWeight){
-    if(steps<=1){
-      const total = entryTotalReps(entry, split, sideKey==="N"?null:sideKey, steps);
-      let maxPrev = -Infinity;
-      for(const it of seq){
-        if(it.workoutId === workoutId) break;
-        if(it.hasData) maxPrev = Math.max(maxPrev, it.total);
-      }
-      isRecord = (total > maxPrev);
-    }else{
-      isRecord = isRecordForLadder(chrono, workoutId, exId, wId, sideKey, entry, steps);
+    const ent = getCellEntry(it.workoutId, exId, wId);
+    const fe = findExercise(exId);
+    if(!ent || !fe) continue;
+    const split = fe.ex.splitLR;
+    const sets = (!split) ? (ent.sets||[]) : ((ent[sideKey]?.sets)||[]);
+    for(const sv of sets){
+      const meta = repsMeta(sv, steps);
+      if(!meta) continue;
+      hasPrev = true;
+      const prev = prevMap.get(meta.prefixKey);
+      if(prev==null || meta.last>prev) prevMap.set(meta.prefixKey, meta.last);
     }
   }
+  if(!hasPrev) return null;
 
-  // новый вес:
-  // - обычный: первое появление данных по этому весу
-  // - лесенка: либо первое появление веса, либо появился новый первый повтор (первая цифра) относительно истории
-  let isNewWeight = false;
-  if(has){
-    let seenBefore = false;
-    for(const it of seq){
-      if(it.workoutId === workoutId) break;
-      if(it.hasData){ seenBefore = true; break; }
-    }
-    if(!seenBefore){
-      isNewWeight = true;
-    }else if(steps>1){
-      const prevFirst = prevFirstPartsSet(chrono, workoutId, exId, wId, sideKey, steps);
-      const curFirst = currentFirstPartsSet(entry, split, sideKey, steps);
-      for(const fp of curFirst){
-        if(!prevFirst.has(fp)){ isNewWeight = true; break; }
-      }
-    }
-  }
+  const variants = [...prevMap.entries()]
+    .sort((a,b)=>a[0].localeCompare(b[0]))
+    .map(([prefix,last])=>{
+      const next = last + 1;
+      return prefix ? `${prefix}-${next}` : `${next}`;
+    });
 
-  // новое упражнение: первое появление любых данных по любому весу упражнения
-  let isNewEx = false;
-  if(has){
-    let anyBefore = false;
-    for(const wid of chrono.wOrder){
-      if(wid === workoutId) break;
-      const wEntries = state.entries[wid] || {};
-      const exMap = wEntries[exId] || null;
-      if(!exMap) continue;
-
-      for(const wKey of Object.keys(exMap)){
-        const ent = exMap[wKey];
-        if(!split){
-          if(entryHasData(ent,false)){ anyBefore = true; break; }
-        }else{
-          if(entryHasData(ent,true,"L") || entryHasData(ent,true,"R")){ anyBefore = true; break; }
-        }
-      }
-      if(anyBefore) break;
-    }
-    isNewEx = !anyBefore;
-  }
-
-  // серый фон: есть предыдущие данные по этому весу и текущая заполнена, но рекорд не поставлен
-  const gray = has && hadPrevDataForThisWeight && !isRecord;
-
-  // Приоритет обводки: рекорд > новый вес > новое упражнение
-  let border = null;
-  if(isRecord) border = "gold";
-  else if(isNewWeight) border = "green";
-  else if(isNewEx) border = "yellow";
-
-  return {border, gray, injury, isRecord, isNewWeight, isNewEx};
+  return variants.length===1 ? variants[0] : variants.join(" или ");
 }
 
 /* ===========================
@@ -1461,8 +1365,7 @@ function renderTable(){
   state.workouts = sortWorkoutsAsc(state.workouts);
   chronoCache = buildChronoIndex();
 
-  const workouts = sortWorkoutsDesc(chronoCache.workouts); // свежая слева
-  const newestWorkoutId = workouts[0]?.id || null;
+  const workouts = sortWorkoutsDesc(chronoCache.workouts);
 
   let html = `<table><thead><tr>`;
   html += `<th class="stickyLeft corner"> </th>`;
@@ -1506,12 +1409,11 @@ function renderTable(){
 
       for(const w of ex.weights){
         if(w.hidden) continue;
-
         if(!ex.splitLR){
-          html += renderWeightRow(workouts, ex, w, "N", newestWorkoutId);
+          html += renderWeightRow(workouts, ex, w, "N");
         }else{
-          html += renderWeightRow(workouts, ex, w, "L", newestWorkoutId);
-          html += renderWeightRow(workouts, ex, w, "R", newestWorkoutId);
+          html += renderWeightRow(workouts, ex, w, "L");
+          html += renderWeightRow(workouts, ex, w, "R");
         }
       }
     }
@@ -1524,21 +1426,11 @@ function renderTable(){
 
   if(!renderTable._didAutoScroll){
     renderTable._didAutoScroll = true;
-    setTimeout(()=>{ tableWrap.scrollLeft = 0; }, 0); // свежая слева
+    setTimeout(()=>{ tableWrap.scrollLeft = 0; }, 0);
   }
 }
 
-function cellDisplayForEntry(entry, split, side, steps){
-  if(!entry) return {valText:"", subText:""};
-  const sets = (!split) ? (entry.sets||[]) : ((entry[side]?.sets)||[]);
-  if(!sets || sets.length===0) return {valText:"", subText:""};
-
-  const pretty = sets.map(sv => normalizeSetDisplay(sv, steps)).filter(Boolean);
-  const subText = pretty.join("+"); // 12+10 или 15-7+13-9
-  return {valText:"", subText};
-}
-
-function renderWeightRow(workouts, ex, w, side, newestWorkoutId){
+function renderWeightRow(workouts, ex, w, side){
   const sideTag = side==="N" ? "" : `<span class="sideTag">${side}</span>`;
   const label = `${escapeHtml(w.label)}`;
 
@@ -1559,13 +1451,11 @@ function renderWeightRow(workouts, ex, w, side, newestWorkoutId){
     const has = entryHasData(entry, split, side==="N"?null:side);
 
     const status = computeCellStatus(chronoCache, wo.id, ex.id, w.id, side);
+    const goal = (!has) ? goalForEmptyCell(chronoCache, wo.id, ex.id, w.id, side) : null;
 
-    const showGoal = (!has && wo.id === newestWorkoutId);
-    const goal = showGoal ? goalForEmptyCell(chronoCache, wo.id, ex.id, w.id, side) : null;
-
-    const disp = has ? cellDisplayForEntry(entry, split, side, steps) : {valText:"", subText:""};
+    const setsArr = split ? (entry?.[side]?.sets||[]) : (entry?.sets||[]);
+    const setsStr = has ? setsArr.map(v=>String(v)).join("+") : "";
     const valText = has ? "" : (goal!=null ? `надо ${goal}` : "");
-    const subText = has ? disp.subText : "";
 
     let cls = "cell";
     if(!has) cls += " empty";
@@ -1578,7 +1468,7 @@ function renderWeightRow(workouts, ex, w, side, newestWorkoutId){
     row += `<td class="${cls}"
       data-cell="${wo.id}|${ex.id}|${w.id}|${side}">
         <div class="val">${escapeHtml(valText)}</div>
-        <div class="sub">${escapeHtml(subText)}</div>
+        <div class="sub">${escapeHtml(setsStr)}</div>
       </td>`;
   }
 
@@ -1682,7 +1572,7 @@ $("#btnAddWorkout").addEventListener("click", ()=>{
 /* ===========================
    Редактор ячейки
 =========================== */
-let cellCtx = null; // {workoutId, exId, wId, side}
+let cellCtx = null;
 function openCellEditor(cellKey){
   const [workoutId, exId, wId, side] = cellKey.split("|");
   const fe = findExercise(exId);
@@ -1692,6 +1582,7 @@ function openCellEditor(cellKey){
 
   const ex = fe.ex;
   const split = ex.splitLR;
+
   const steps = weightStepsFromLabel(fw.w.label);
 
   const entry = getCellEntry(workoutId, exId, wId) || (split ? {L:{sets:[],injury:false},R:{sets:[],injury:false}} : {sets:[],injury:false});
@@ -1725,13 +1616,11 @@ cellModalOverlay.addEventListener("click", (e)=>{
 
 function renderSetsEditor(sets, steps){
   const wrap = $("#setsWrap");
-  if(!sets || sets.length===0){
-    sets = [""];
-  }
-  const hint = (steps>1) ? `например: ${Array(steps).fill("0").map((_,i)=> i===0?"15":"7").join("-")}` : `например: 12`;
+  if(!sets || sets.length===0) sets = [""];
+
   wrap.innerHTML = sets.map((v, idx)=>`
     <div class="setRow" data-set-row="${idx}">
-      <input type="text" inputmode="text" placeholder="${hint}" value="${escapeAttr(v)}" />
+      <input type="text" inputmode="${steps>1 ? "text" : "numeric"}" placeholder="${steps>1 ? "повторы (напр. 15-7)" : "повторы"}" value="${escapeAttr(v)}" />
       <button class="btn icon" data-del-set="${idx}" aria-label="Удалить сет">−</button>
     </div>
   `).join("");
@@ -1747,20 +1636,17 @@ function renderSetsEditor(sets, steps){
 }
 
 $("#btnAddSet").addEventListener("click", ()=>{
-  if(!cellCtx) return;
-  const {exId, wId} = cellCtx;
-  const fw = findWeight(exId, wId);
-  const steps = weightStepsFromLabel(fw?.w?.label);
-
   const wrap = $("#setsWrap");
   const rows = $$('[data-set-row] input', wrap).map(inp=>inp.value);
   rows.push("");
+  const { exId, wId } = cellCtx || {};
+  const fw = (exId && wId) ? findWeight(exId, wId) : null;
+  const steps = weightStepsFromLabel(fw?.w?.label);
   renderSetsEditor(rows, steps);
 });
 $("#btnClearSets").addEventListener("click", ()=>{
-  if(!cellCtx) return;
-  const {exId, wId} = cellCtx;
-  const fw = findWeight(exId, wId);
+  const { exId, wId } = cellCtx || {};
+  const fw = (exId && wId) ? findWeight(exId, wId) : null;
   const steps = weightStepsFromLabel(fw?.w?.label);
   renderSetsEditor([""], steps);
 });
@@ -1777,13 +1663,12 @@ $("#btnSaveCell").addEventListener("click", ()=>{
   const fe = findExercise(exId);
   const fw = findWeight(exId, wId);
   if(!fe || !fw) return;
-  const split = fe.ex.splitLR;
+
   const steps = weightStepsFromLabel(fw.w.label);
+  const split = fe.ex.splitLR;
 
   const raw = $$('[data-set-row] input', $("#setsWrap")).map(inp=>inp.value);
-  const parsed = raw
-    .map(v => parseRepsValue(v, steps))
-    .filter(v => v!=null);
+  const parsed = raw.map(v=>parseRepsValue(v, steps)).filter(v=>v!=null);
 
   const injuryOn = ($("#btnToggleInjury").dataset.on === "1");
 
@@ -1822,10 +1707,7 @@ $("#btnSaveCell").addEventListener("click", ()=>{
 });
 
 /* ===========================
-   Статистика тренировки (обновлено: УБРАНО 1.5 за лесенку)
-   Правила:
-   - split L/R: (L+R)/2
-   - split L/R + лесенка: +0.25 за каждый сет на каждую сторону
+   Статистика тренировки (ИЗМЕНЕНИЕ ТОЛЬКО ТУТ)
 =========================== */
 function openWorkoutStats(workoutId){
   const wo = state.workouts.find(w=>w.id===workoutId);
@@ -1845,11 +1727,12 @@ function openWorkoutStats(workoutId){
       for(const w of ex.weights){
         if(w.hidden) continue;
 
-        const isLadder = (weightStepsFromLabel(w.label) > 1);
+        const steps = weightStepsFromLabel(w.label);
+        const isLadder = steps>1;
 
         if(!ex.splitLR){
           const entry = getCellEntry(workoutId, ex.id, w.id);
-          const has = entryHasData(entry,false);
+          const has = entryHasData(entry,false,null);
           if(!has) continue;
 
           const st = computeCellStatus(chronoCache, workoutId, ex.id, w.id, "N");
@@ -1857,15 +1740,27 @@ function openWorkoutStats(workoutId){
           if(st.isNewWeight) newWeights++;
           if(st.isNewEx) newExercises++;
 
-          // 1 сет = 1 (никаких 1.5)
-          setsByBlock[b.name] += entrySetsCount(entry,false);
+          // правило: лесенка = 1.5 подхода за сет
+          const baseSets = entrySetsCount(entry,false,null);
+          const weightPerSet = isLadder ? 1.5 : 1.0;
+          setsByBlock[b.name] += baseSets * weightPerSet;
+
         }else{
           const entry = getCellEntry(workoutId, ex.id, w.id);
+          // ВАЖНО: L+R, потом /2
+          const lCount = entrySetsCount(entry,true,"L");
+          const rCount = entrySetsCount(entry,true,"R");
 
-          const cntL = entrySetsCount(entry,true,"L");
-          const cntR = entrySetsCount(entry,true,"R");
+          // правило: в split-упражнениях лесенка = 1.25 на каждую руку (за сет)
+          const perSideWeight = isLadder ? 1.25 : 1.0;
 
-          // достижения считаем по заполненным сторонам (как раньше)
+          const weightedL = lCount * perSideWeight;
+          const weightedR = rCount * perSideWeight;
+
+          const combined = (weightedL + weightedR) / 2;
+          setsByBlock[b.name] += combined;
+
+          // статусы считаем по факту наличия данных (как было)
           for(const side of ["L","R"]){
             const has = entryHasData(entry,true,side);
             if(!has) continue;
@@ -1874,11 +1769,6 @@ function openWorkoutStats(workoutId){
             if(st.isNewWeight) newWeights++;
             if(st.isNewEx) newExercises++;
           }
-
-          // зачёт:
-          const base = (cntL + cntR) / 2;
-          const bonus = isLadder ? 0.25 * (cntL + cntR) : 0;
-          setsByBlock[b.name] += (base + bonus);
         }
       }
     }
@@ -1886,7 +1776,7 @@ function openWorkoutStats(workoutId){
 
   const blockLines = Object.entries(setsByBlock)
     .filter(([,v])=>v>0)
-    .map(([k,v])=>`<div class="kpi"><b>${(Math.round(v*100)/100).toString()}</b><small>сетов • ${escapeHtml(k)}</small></div>`)
+    .map(([k,v])=>`<div class="kpi"><b>${(Math.round(v*100)/100).toString()}</b><small>подходов • ${escapeHtml(k)}</small></div>`)
     .join("");
 
   const html = `
@@ -1897,9 +1787,7 @@ function openWorkoutStats(workoutId){
     </div>
 
     <div style="margin:8px 0 10px; color:var(--muted); font-size:12px">
-      Сеты считаются как количество значений в ячейках (например “12+10” = 2).
-      <br/>
-      Split L/R: (L+R)/2. Для лесенок в Split L/R добавляется +0.25 за каждый сет на каждую сторону.
+      Подходы считаются как количество сетов в ячейках. Лесенка: без split = 1.5 за сет; со split = 1.25 за сет на каждую руку, затем (L+R)/2.
     </div>
 
     <div class="kpiRow">
@@ -1917,7 +1805,7 @@ function openWorkoutStats(workoutId){
 }
 
 /* ===========================
-   Меню: добавить/управлять
+   Меню (как было)
 =========================== */
 function refreshMenuSelects(){
   $("#selBlockAddEx").innerHTML = state.blocks.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
@@ -2028,8 +1916,7 @@ $("#btnToggleSplit").addEventListener("click", ()=>{
   fe.ex.splitLR = !fe.ex.splitLR;
 
   for(const wid of Object.keys(state.entries)){
-    const wEntries = state.entries[wid] || {};
-    const exMap = wEntries[exId] || null;
+    const exMap = (state.entries[wid]||{})[exId] || null;
     if(!exMap) continue;
 
     for(const wId of Object.keys(exMap)){
@@ -2084,7 +1971,7 @@ $("#btnDeleteExercise").addEventListener("click", ()=>{
 });
 
 /* ===========================
-   Аналитика (canvas)
+   Аналитика (как было)
 =========================== */
 function refreshAnalyticsSelects(){
   anBlock.innerHTML = state.blocks.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
@@ -2100,7 +1987,6 @@ function refreshAnalyticsExerciseList(){
   anExercise.innerHTML = exs.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   if(!anExercise.value && exs[0]) anExercise.value = exs[0].id;
 }
-
 anBlock.addEventListener("change", ()=>{ refreshAnalyticsExerciseList(); renderAnalytics(); });
 anExercise.addEventListener("change", renderAnalytics);
 anMetric.addEventListener("change", renderAnalytics);
@@ -2129,26 +2015,25 @@ function renderAnalytics(){
     let injuries = 0;
 
     for(const w of ex.weights){
-      const steps = weightStepsFromLabel(w.label);
       const entry = getCellEntry(wo.id, exId, w.id);
+      const steps = weightStepsFromLabel(w.label);
+      const wt = weightMaxNumber(w.label);
 
       if(!ex.splitLR){
-        if(entryHasData(entry,false)){
+        if(entryHasData(entry,false,null)){
           const total = entryTotalReps(entry,false,null,steps);
           reps += total;
-          const wt = weightMaxNumber(w.label);
           if(Number.isFinite(wt)) volume += (total * wt);
 
           const st = computeCellStatus(chronoCache, wo.id, exId, w.id, "N");
           if(st.isRecord) records++;
-          if(entryInjury(entry,false)) injuries++;
+          if(entryInjury(entry,false,null)) injuries++;
         }
       }else{
         for(const side of ["L","R"]){
           if(entryHasData(entry,true,side)){
             const total = entryTotalReps(entry,true,side,steps);
             reps += total;
-            const wt = weightMaxNumber(w.label);
             if(Number.isFinite(wt)) volume += (total * wt);
 
             const st = computeCellStatus(chronoCache, wo.id, exId, w.id, side);
@@ -2237,13 +2122,11 @@ function buildInsights(perWorkoutStats, ex){
       const wt = weightMaxNumber(w.label);
       if(!Number.isFinite(wt)) continue;
 
-      const steps = weightStepsFromLabel(w.label);
       const split = ex.splitLR;
-
       if(!split){
-        if(entryHasData(entry,false)){
+        if(entryHasData(entry,false,null)){
           usedWeights.push(wt);
-          if(entryInjury(entry,false)) injuryWeights.push(wt);
+          if(entryInjury(entry,false,null)) injuryWeights.push(wt);
         }
       }else{
         for(const side of ["L","R"]){
@@ -2255,7 +2138,6 @@ function buildInsights(perWorkoutStats, ex){
       }
     }
   }
-
   if(usedWeights.length>=4 && injuryWeights.length>=2){
     usedWeights.sort((a,b)=>a-b);
     const med = usedWeights[Math.floor(usedWeights.length/2)];
@@ -2289,6 +2171,7 @@ function drawEmptyChart(text){
 function drawLineChart(labels, values, title){
   const ctx = chart.getContext("2d");
   const W = chart.width, H = chart.height;
+
   ctx.clearRect(0,0,W,H);
 
   const padL = 50, padR = 16, padT = 24, padB = 46;
@@ -2328,7 +2211,10 @@ function drawLineChart(labels, values, title){
   ctx.fillText(title, x0, 2);
 
   const n = labels.length;
-  if(n===0){ drawEmptyChart("Нет данных"); return; }
+  if(n===0){
+    drawEmptyChart("Нет данных");
+    return;
+  }
 
   const xAt = (i)=> x0 + (n===1 ? innerW/2 : innerW*(i/(n-1)));
   const yAt = (v)=> y0 + innerH*( (maxV - v)/span );
@@ -2387,7 +2273,7 @@ function escapeAttr(s){
 }
 
 /* ===========================
-   Init: рендер
+   Рендер всего + init
 =========================== */
 function renderAll(){
   renderTable();
@@ -2395,6 +2281,7 @@ function renderAll(){
   if(viewAnalytics.classList.contains("active")) renderAnalytics();
 }
 renderAll();
+
 refreshAnalyticsSelects();
 
 document.addEventListener("keydown", (e)=>{
