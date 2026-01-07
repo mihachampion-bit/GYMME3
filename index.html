@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -193,7 +193,12 @@
       margin-top:2px;
       overflow:hidden;text-overflow:ellipsis;
     }
-    td.cell.empty .val{color:var(--muted);font-weight:700}
+
+    /* ===== ИЗМЕНЕНО: цели (надо X) не жирные; повторы — жирные и чёрные ===== */
+    td.cell.empty .val{color:var(--muted);font-weight:400}
+    td.cell:not(.empty) .sub{color:var(--fg);font-weight:800}
+    /* ===== конец изменений ===== */
+
     td.cell.empty .sub{display:none}
 
     td.cell.gray{background:var(--grayFill);}
