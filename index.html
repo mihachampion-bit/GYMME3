@@ -1,1460 +1,1863 @@
 <!doctype html> 
+
 <html lang="ru">
+
 <head>
+
   <meta charset="utf-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
   <title>Gym Progress — offline</title>
+
   <style>
+
     :root{
+
       --bg:#ffffff; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0;
+
       --card:#f8fafc; --card2:#f1f5f9;
+
       --accent:#2563eb; --danger:#dc2626;
+
       --shadow: 0 10px 30px rgba(2,6,23,.08);
+
+
 
       --stickyBg: rgba(255,255,255,.92);
 
+
+
       --gold:#f59e0b;     /* рекорд */
+
       --green:#22c55e;    /* новый вес */
+
       --yellow:#eab308;   /* новое упражнение */
+
       --grayFill:#f1f5f9; /* не рекорд */
+
       --injuryFill:#ffe4f1; /* травма (розовый) */
 
+
+
       --radius:16px;
+
       --rowH: 44px;
+
       --leftW: 132px;
+
     }
+
     [data-theme="dark"]{
+
       --bg:#0b1220; --fg:#e5e7eb; --muted:#9aa7bd; --line:#1f2a44;
+
       --card:#0f172a; --card2:#111c33;
+
       --accent:#60a5fa; --danger:#f87171;
+
       --shadow: 0 10px 30px rgba(0,0,0,.35);
+
       --stickyBg: rgba(11,18,32,.88);
 
+
+
       --grayFill:#101a31;
+
       --injuryFill:#3a1530;
+
     }
+
     *{box-sizing:border-box}
+
     html,body{height:100%}
+
     body{
+
       margin:0; font: 14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+
       background:var(--bg); color:var(--fg);
+
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+
     }
+
     button,input,select{font:inherit}
+
     .app{min-height:100%;display:flex;flex-direction:column;}
+
     .topbar{
+
       position:sticky; top:0; z-index:50;
+
       backdrop-filter: blur(10px);
+
       background: var(--stickyBg);
+
       border-bottom:1px solid var(--line);
+
       padding: 10px 12px calc(10px + env(safe-area-inset-top));
+
     }
+
     .topbar .row{display:flex;align-items:center;gap:10px;}
+
     .brand{display:flex;flex-direction:column;gap:2px;min-width:0;}
+
     .brand b{font-weight:800;letter-spacing:.2px}
+
     .brand small{color:var(--muted)}
+
     .spacer{flex:1}
+
     .btn{
+
       border:1px solid var(--line);
+
       background: var(--card);
+
       color: var(--fg);
+
       border-radius: 12px;
+
       padding: 10px 12px;
+
       display:inline-flex; align-items:center; gap:8px;
+
       cursor:pointer;
+
       touch-action: manipulation;
+
     }
+
     .btn:active{transform: translateY(1px)}
+
     .btn.primary{border-color:transparent;background:var(--accent);color:white;}
+
     .btn.icon{width:42px;justify-content:center;padding:10px;}
+
     .seg{
+
       display:flex;gap:6px;padding:6px;
+
       border:1px solid var(--line);
+
       border-radius:14px;
+
       background:var(--card);
+
     }
+
     .seg button{
+
       border:0;background:transparent;color:var(--muted);
+
       padding:8px 10px;border-radius:10px;cursor:pointer;
+
     }
+
     .seg button.active{background:var(--card2);color:var(--fg);font-weight:700;}
 
+
+
     .content{flex:1;display:flex;flex-direction:column;min-height:0}
+
     .view{flex:1;min-height:0;display:none}
+
     .view.active{display:flex;flex-direction:column;min-height:0}
 
+
+
     .tableWrap{
+
       flex:1;min-height:0;
+
       overflow:auto;
+
       -webkit-overflow-scrolling: touch;
+
       padding:10px 0;
+
     }
+
     table{
+
       border-collapse: separate;
+
       border-spacing:0;
+
       width:max-content;
+
       min-width:100%;
+
       position:relative;
+
     }
+
     th,td{
+
       border-bottom:1px solid var(--line);
+
       border-right:1px solid var(--line);
+
       height:var(--rowH);
+
       padding:6px 8px;
+
       vertical-align:middle;
+
       background:var(--bg);
+
       white-space:nowrap;
+
     }
+
+
 
     /* закрепление заголовка дат */
+
     thead{
+
       position:sticky;
+
       top:0;
+
       z-index:15;
+
       background:var(--stickyBg);
+
       backdrop-filter: blur(10px);
+
     }
+
     thead tr{background:var(--stickyBg);}
+
     thead th{
+
       position:sticky;
+
       top:0;
+
       z-index:16;
+
       background:var(--stickyBg);
+
       backdrop-filter: blur(10px);
+
       font-weight:800;
+
     }
+
+
 
     th:first-child, td:first-child{border-left:1px solid var(--line);}
+
     tr:first-child th{border-top:1px solid var(--line);}
 
+
+
     .stickyLeft{
+
       position:sticky;left:0;z-index:8;
+
       background:var(--stickyBg);
+
       backdrop-filter: blur(10px);
+
       width:var(--leftW);
+
       min-width:var(--leftW);
+
       max-width:var(--leftW);
+
       border-right:1px solid var(--line);
+
     }
+
     th.stickyLeft{z-index:18}
+
     .corner{z-index:25 !important;}
 
+
+
     .leftCell{display:flex;align-items:center;gap:8px;min-width:0;}
+
     .leftText{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+
     .blockRow .leftText{text-transform:uppercase;font-weight:900;letter-spacing:.8px;}
+
     .exRow .leftText{font-weight:800;text-transform:lowercase;padding-left:10px;}
+
     .wRow .leftText{font-weight:500;text-transform:lowercase;padding-left:22px;color:var(--muted);}
+
     .wRow .sideTag{
+
       font-size:11px;padding:2px 6px;border-radius:999px;
+
       border:1px solid var(--line);color:var(--muted);
+
       background:var(--card);flex:0 0 auto;
+
     }
+
+
 
     /* перенос названий упражнений */
+
     .exRow td{height:auto;white-space:normal;}
+
     .exRow .stickyLeft{white-space:normal;}
+
     .exRow .leftText{
+
       white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;
+
     }
+
+
 
     /* перенос весов */
+
     .wRow td{height:auto;white-space:normal;}
+
     .wRow .stickyLeft{white-space:normal;}
+
     .wRow .leftText{
+
       white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;
+
     }
+
+
 
     .tinyIcon{
+
       border:0;background:transparent;color:var(--muted);
+
       padding:6px;margin:-6px;cursor:pointer;
+
     }
+
     .tinyIcon:active{transform: translateY(1px)}
+
     .pill{
+
       display:inline-flex;align-items:center;gap:6px;
+
       padding:4px 8px;border-radius:999px;
+
       border:1px solid var(--line);background:var(--card);
+
       color:var(--muted);font-size:12px;
+
     }
+
+
 
     td.cell{
+
       position:relative;
+
       cursor:pointer;
+
       background:var(--bg);
+
       min-width:96px;
+
       max-width:120px;
-    }
-    td.cell .val{
-      font-weight:800;
-      font-size:13px;
-      line-height:1.1;
-    }
-    td.cell .sub{
-      font-size:11px;color:var(--muted);
-      margin-top:2px;
-      overflow:hidden;text-overflow:ellipsis;
+
     }
 
+    td.cell .val{
+
+      font-weight:800;
+
+      font-size:13px;
+
+      line-height:1.1;
+
+    }
+
+    td.cell .sub{
+
+      font-size:11px;color:var(--muted);
+
+      margin-top:2px;
+
+      overflow:hidden;text-overflow:ellipsis;
+
+    }
+
+
+
     /* ===== ИЗМЕНЕНО: цели (надо X) не жирные; повторы — жирные и чёрные ===== */
+
     td.cell.empty .val{color:var(--muted);font-weight:400}
+
     td.cell:not(.empty) .sub{color:var(--fg);font-weight:800}
+
     /* ===== конец изменений ===== */
+
+
 
     td.cell.empty .sub{display:none}
 
+
+
     td.cell.gray{background:var(--grayFill);}
+
     td.cell.injury{background:var(--injuryFill);}
+
     td.cell.border-gold{box-shadow: inset 0 0 0 2px var(--gold);}
+
     td.cell.border-green{box-shadow: inset 0 0 0 2px var(--green);}
+
     td.cell.border-yellow{box-shadow: inset 0 0 0 2px var(--yellow);}
 
+
+
     .dateHead{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+
     .dateHead .d{font-weight:900}
+
     .dateHead .trash{
+
       border:0;background:transparent;color:var(--muted);
+
       cursor:pointer;padding:6px;margin:-6px;border-radius:10px;
+
     }
+
     .dateHead .trash:active{transform: translateY(1px)}
 
+
+
     .hintRow{
+
       padding:0 12px 12px;
+
       display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+
       color:var(--muted);
+
     }
+
+
 
     .overlay{position:fixed;inset:0;background:rgba(2,6,23,.35);display:none;z-index:100;}
+
     .overlay.show{display:block}
+
     .drawer{
+
       position:fixed;top:0;right:0;bottom:0;
+
       width:min(92vw,420px);
+
       background:var(--bg);
+
       border-left:1px solid var(--line);
+
       box-shadow: var(--shadow);
+
       transform: translateX(100%);
+
       transition: transform .18s ease;
+
       z-index:110;
+
       display:flex;flex-direction:column;
+
       padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+
     }
+
     .drawer.show{transform: translateX(0)}
+
     .drawer header{
+
       display:flex;align-items:center;gap:10px;
+
       padding:6px 2px 10px;border-bottom:1px solid var(--line);
+
     }
+
     .drawer header b{font-size:16px}
+
     .drawer .body{flex:1;overflow:auto;padding-top:10px}
+
     .section{
+
       background:var(--card);
+
       border:1px solid var(--line);
+
       border-radius:var(--radius);
+
       padding:10px;
+
       margin-bottom:10px;
+
     }
+
     .section h3{
+
       margin:0 0 8px 0;
+
       font-size:13px;
+
       text-transform:uppercase;
+
       letter-spacing:.8px;
+
       color:var(--muted);
+
     }
+
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
     .field{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+
     .field label{font-size:12px;color:var(--muted)}
+
     input[type="text"], input[type="number"], select{
+
       border:1px solid var(--line);
+
       background:var(--bg);
+
       color:var(--fg);
+
       border-radius:12px;
+
       padding:10px 10px;
+
       outline:none;
+
     }
+
     .rowActions{display:flex;gap:8px;flex-wrap:wrap}
+
     .danger{border-color:rgba(220,38,38,.35);color:var(--danger);background:transparent}
 
+
+
     .modalOverlay{
+
       position:fixed;inset:0;background:rgba(2,6,23,.38);
+
       display:none;z-index:200;padding:12px;
+
     }
+
     .modalOverlay.show{display:flex;align-items:center;justify-content:center}
+
     .modal{
+
       width:min(96vw,520px);
+
       background:var(--bg);
+
       border:1px solid var(--line);
+
       border-radius:18px;
+
       box-shadow: var(--shadow);
+
       overflow:hidden;
+
     }
+
     .modal header{
+
       padding:12px;border-bottom:1px solid var(--line);
+
       display:flex;align-items:center;justify-content:space-between;gap:10px;
+
       background:var(--card);
+
     }
+
     .modal header b{font-size:14px}
+
     .modal main{padding:12px}
+
     .modal footer{
+
       padding:12px;border-top:1px solid var(--line);
+
       display:flex;gap:8px;justify-content:flex-end;
+
       background:var(--card);
+
     }
+
     .sets{display:flex;flex-direction:column;gap:8px;margin:8px 0 10px;}
+
     .setRow{display:flex;gap:8px;align-items:center;}
+
     .setRow input{flex:1}
+
     .setRow button{width:42px;}
+
     .toggleLine{
+
       display:flex;align-items:center;justify-content:space-between;
+
       padding:10px;border:1px solid var(--line);
+
       border-radius:14px;background:var(--card);
+
       margin-top:8px;
+
     }
+
     .toggleLine .left{display:flex;align-items:center;gap:10px}
+
     .badge{
+
       font-size:12px;padding:4px 8px;border-radius:999px;
+
       border:1px solid var(--line);background:var(--bg);color:var(--muted);
+
     }
+
+
 
     .analyticsWrap{padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0;}
+
     .panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);padding:10px;}
+
     .panel h3{margin:0 0 8px 0;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);}
+
     canvas{width:100%;height:180px;background:var(--bg);border:1px solid var(--line);border-radius:14px;display:block;}
+
     .insights{display:flex;flex-direction:column;gap:8px;color:var(--fg);}
+
     .insights .muted{color:var(--muted);font-size:12px}
+
     .kpiRow{display:flex;gap:8px;flex-wrap:wrap}
+
     .kpi{
+
       flex:1;min-width:130px;border:1px solid var(--line);
+
       border-radius:14px;background:var(--bg);padding:10px;
+
     }
+
     .kpi b{display:block;font-size:16px}
+
     .kpi small{color:var(--muted)}
+
     .legendLine{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
     .dot{width:10px;height:10px;border-radius:3px;border:2px solid transparent;display:inline-block}
+
     .dot.gold{border-color:var(--gold)}
+
     .dot.green{border-color:var(--green)}
+
     .dot.yellow{border-color:var(--yellow)}
+
     .dot.gray{background:var(--grayFill);border-color:var(--line)}
+
     .dot.pink{background:var(--injuryFill);border-color:var(--line)}
 
+
+
     @media (max-width: 380px){
+
       :root{ --leftW: 120px; --rowH: 42px; }
+
     }
+
   </style>
+
 </head>
+
 <body>
+
 <div class="app" id="app">
+
   <div class="topbar">
+
     <div class="row">
+
       <button class="btn icon" id="btnMenu" aria-label="Меню">☰</button>
+
       <div class="brand">
+
         <b>Gym Progress</b>
+
         <small id="subTitle">offline • таблица</small>
+
       </div>
+
       <div class="spacer"></div>
+
       <div class="seg" role="tablist" aria-label="Экраны">
+
         <button id="tabTable" class="active" role="tab" aria-selected="true">Таблица</button>
+
         <button id="tabAnalytics" role="tab" aria-selected="false">Аналитика</button>
+
       </div>
+
       <button class="btn primary" id="btnAddWorkout">+ тренировка</button>
+
       <button class="btn icon" id="btnHelp" aria-label="Легенда">?</button>
+
     </div>
+
   </div>
+
+
 
   <div class="content">
+
     <div class="hintRow" id="hintRow">
+
       <span class="pill">Тап по ячейке → редактировать</span>
+
       <span class="pill">Long-press по дате (~0.7s) → статистика</span>
+
     </div>
+
+
 
     <section class="view active" id="viewTable" aria-label="Таблица">
+
       <div class="tableWrap" id="tableWrap"></div>
+
     </section>
+
+
 
     <section class="view" id="viewAnalytics" aria-label="Аналитика">
+
       <div class="analyticsWrap">
+
         <div class="panel">
+
           <h3>Фильтры</h3>
+
           <div class="grid2">
+
             <div class="field">
+
               <label>Блок</label>
+
               <select id="anBlock"></select>
+
             </div>
+
             <div class="field">
+
               <label>Упражнение</label>
+
               <select id="anExercise"></select>
+
             </div>
+
           </div>
+
           <div class="field" style="margin-bottom:0">
+
             <label>Метрика</label>
+
             <select id="anMetric">
+
               <option value="volume">Объём (sets × reps × weight)</option>
+
               <option value="reps">Повторы (сумма reps)</option>
+
               <option value="records">Рекорды (за тренировку)</option>
+
               <option value="injuries">Травмы (за тренировку)</option>
+
             </select>
+
           </div>
+
         </div>
 
+
+
         <div class="panel">
+
           <h3>График</h3>
+
           <canvas id="chart" width="800" height="360"></canvas>
+
           <div class="legendLine" style="margin-top:8px; color:var(--muted); font-size:12px">
+
             <span>Простой график без библиотек. Масштаб авто.</span>
+
           </div>
+
         </div>
 
+
+
         <div class="panel">
+
           <h3>Ключевые показатели</h3>
+
           <div class="kpiRow" id="kpiRow"></div>
+
           <div class="insights" id="insights" style="margin-top:10px"></div>
+
         </div>
+
       </div>
+
     </section>
+
   </div>
+
 </div>
+
+
 
 <div class="overlay" id="overlay"></div>
+
 <aside class="drawer" id="drawer" aria-label="Меню">
+
   <header>
+
     <b>Меню</b>
+
     <div class="spacer"></div>
+
     <button class="btn icon" id="btnCloseDrawer" aria-label="Закрыть">✕</button>
+
   </header>
 
+
+
   <div class="body">
+
     <div class="section">
+
       <h3>Тема</h3>
+
       <div class="toggleLine">
+
         <div class="left">
+
           <span class="badge">🌙</span>
+
           <div>
+
             <b style="display:block">Ночной режим</b>
+
             <small style="color:var(--muted)">Сохраняется локально</small>
+
           </div>
+
         </div>
+
         <button class="btn" id="btnTheme">Переключить</button>
+
       </div>
+
     </div>
 
+
+
     <div class="section">
+
       <h3>Добавить упражнение</h3>
+
       <div class="field">
+
         <label>Блок</label>
+
         <select id="selBlockAddEx"></select>
+
       </div>
+
       <div class="field">
+
         <label>Название (как хочешь)</label>
+
         <input id="inExName" type="text" placeholder="например: жим лёжа" />
+
       </div>
+
       <div class="rowActions">
+
         <button class="btn primary" id="btnAddExercise">Добавить</button>
+
       </div>
+
       <div style="margin-top:8px; color:var(--muted); font-size:12px">
+
         Упражнения можно архивировать, чтобы не мешали, но история останется.
+
       </div>
+
     </div>
 
+
+
     <div class="section">
+
       <h3>Добавить вес</h3>
+
       <div class="field">
+
         <label>Упражнение</label>
+
         <select id="selExAddWeight"></select>
+
       </div>
+
       <div class="field">
+
         <label>Вес (например: 40 или 60-50)</label>
+
         <input id="inWeightLabel" type="text" placeholder="40" />
+
       </div>
+
       <div class="rowActions">
+
         <button class="btn primary" id="btnAddWeight">Добавить вес</button>
+
       </div>
+
       <div style="margin-top:8px; color:var(--muted); font-size:12px">
+
         Веса сортируются по возрастанию. “60-50” ставится по максимальному числу (60).
+
       </div>
+
     </div>
 
+
+
     <div class="section">
+
       <h3>Управление</h3>
+
       <div class="field">
+
         <label>Упражнение</label>
+
         <select id="selManageExercise"></select>
+
       </div>
+
+
 
       <div class="toggleLine" style="margin-top:0">
+
         <div class="left">
+
           <span class="badge">L/R</span>
+
           <div>
+
             <b style="display:block">Split L/R</b>
+
             <small style="color:var(--muted)">Раздельный ввод</small>
+
           </div>
+
         </div>
+
         <button class="btn" id="btnToggleSplit">Переключить</button>
+
       </div>
 
+
+
       <div class="toggleLine">
+
         <div class="left">
+
           <span class="badge">🗄️</span>
+
           <div>
+
             <b style="display:block">Архив</b>
+
             <small style="color:var(--muted)">Скрыть упражнение (не удалять)</small>
+
           </div>
+
         </div>
+
         <button class="btn" id="btnToggleArchive">Переключить</button>
+
       </div>
+
+
 
       <div style="margin-top:10px">
+
         <div style="font-size:12px; color:var(--muted); margin-bottom:6px">Веса (показ/скрыть)</div>
+
         <div id="weightsList"></div>
+
       </div>
+
+
 
       <div style="margin-top:12px" class="rowActions">
+
         <button class="btn danger" id="btnDeleteExercise">Удалить навсегда…</button>
+
       </div>
+
       <div style="margin-top:6px; color:var(--muted); font-size:12px">
+
         Удаление уничтожает историю. Архив обычно лучше.
+
       </div>
+
     </div>
+
+
 
     <div class="section">
+
       <h3>Данные</h3>
+
       <div class="rowActions">
+
         <button class="btn" id="btnExport">Экспорт JSON</button>
+
         <button class="btn" id="btnImport">Импорт JSON</button>
+
         <button class="btn danger" id="btnReset">Сброс (seed)</button>
+
       </div>
+
       <div style="margin-top:8px; color:var(--muted); font-size:12px">
+
         Всё хранится в LocalStorage. Импорт перезаписывает данные.
+
       </div>
+
     </div>
+
   </div>
+
 </aside>
 
+
+
 <div class="modalOverlay" id="cellModalOverlay" aria-hidden="true">
+
   <div class="modal" role="dialog" aria-modal="true" aria-label="Редактор">
+
     <header>
+
       <div>
+
         <b id="cellTitle">Ячейка</b><br/>
+
         <small id="cellSubtitle" style="color:var(--muted)"></small>
+
       </div>
+
       <button class="btn icon" id="btnCloseCellModal" aria-label="Закрыть">✕</button>
+
     </header>
+
     <main>
+
       <div class="sets" id="setsWrap"></div>
+
       <div class="rowActions">
+
         <button class="btn" id="btnAddSet">+ сет</button>
+
         <button class="btn" id="btnClearSets">Очистить</button>
+
       </div>
 
-      <div class="toggleLine">
-        <div class="left">
-          <span class="badge">⭐</span>
-          <div>
-            <b style="display:block">План (звезда)</b>
-            <small style="color:var(--muted)">Пометка на текущую тренировку</small>
-          </div>
-        </div>
-        <button class="btn" id="btnTogglePlanned">Выкл</button>
-      </div>
+
 
       <div class="toggleLine">
+
         <div class="left">
+
           <span class="badge">🩹</span>
+
           <div>
+
             <b style="display:block">Травма</b>
+
             <small style="color:var(--muted)">Розовый фон, но статусная обводка сохраняется</small>
+
           </div>
+
         </div>
+
         <button class="btn" id="btnToggleInjury">Выкл</button>
+
       </div>
+
     </main>
+
     <footer>
+
       <button class="btn" id="btnCancelCell">Отмена</button>
+
       <button class="btn primary" id="btnSaveCell">Сохранить</button>
+
     </footer>
+
   </div>
+
 </div>
+
+
 
 <div class="modalOverlay" id="infoModalOverlay" aria-hidden="true">
+
   <div class="modal" role="dialog" aria-modal="true" aria-label="Инфо">
+
     <header>
+
       <b id="infoTitle">Инфо</b>
+
       <button class="btn icon" id="btnCloseInfoModal" aria-label="Закрыть">✕</button>
+
     </header>
+
     <main id="infoBody"></main>
+
     <footer>
+
       <button class="btn primary" id="btnCloseInfoModal2">Ок</button>
+
     </footer>
+
   </div>
+
 </div>
 
+
+
 <script>
+
 /* ===========================
+
    Константы + утилиты
+
 =========================== */
+
 const LS_KEY = "gymProgress.v1";
+
 const DEFAULT_BLOCKS = ["ГРУДЬ","БИЦЕПС","СПИНА","ДЕЛЬТЫ","НОГИ"];
 
+
+
 const STATUS = {
+
   RECORD: "record",
+
   NEW_WEIGHT: "new_weight",
+
   NEW_EX: "new_ex",
+
   NOT_RECORD: "not_record",
+
 };
+
+
 
 const nowId = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
 
+
+
 const clampInt = (v) => {
+
   const n = parseInt(String(v||"").trim(), 10);
+
   return Number.isFinite(n) && n>=0 ? n : null;
+
 };
 
+
+
 function parseDDMMYYYY(s){
+
   if(!s) return null;
+
   const m = String(s).trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+
   if(!m) return null;
+
   const dd = +m[1], mm = +m[2], yyyy = +m[3];
+
   const d = new Date(yyyy, mm-1, dd);
+
   if(d.getFullYear()!==yyyy || (d.getMonth()+1)!==mm || d.getDate()!==dd) return null;
+
   return d;
+
 }
+
 function fmtDate(d){
+
   const dd = String(d.getDate()).padStart(2,"0");
+
   const mm = String(d.getMonth()+1).padStart(2,"0");
+
   const yy = d.getFullYear();
+
   return `${dd}.${mm}.${yy}`;
+
 }
+
 function sortWorkoutsAsc(workouts){
+
   return [...workouts].sort((a,b)=>{
+
     const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+
     const ta = da?da.getTime():0, tb = db?db.getTime():0;
+
     return ta-tb;
+
   });
+
 }
+
 function sortWorkoutsDesc(workouts){
+
   return [...workouts].sort((a,b)=>{
+
     const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+
     const ta = da?da.getTime():0, tb = db?db.getTime():0;
+
     return tb-ta;
+
   });
+
 }
+
+
 
 function weightMaxNumber(label){
+
   const s = String(label||"").trim();
+
   const nums = s.match(/(\d+(?:[.,]\d+)?)/g);
+
   if(!nums) return Number.POSITIVE_INFINITY;
+
   let max = -Infinity;
+
   for(const t of nums){
+
     const n = parseFloat(t.replace(",","."));
+
     if(Number.isFinite(n)) max = Math.max(max,n);
+
   }
+
   return Number.isFinite(max) ? max : Number.POSITIVE_INFINITY;
+
 }
+
 function weightStepsFromLabel(weightLabel){
+
   const s = String(weightLabel||"").trim();
+
   if(!s.includes("-")) return 1;
+
   const parts = s.split("-").map(x=>x.trim()).filter(Boolean);
+
   if(parts.length < 2) return 1;
+
   const ok = parts.every(p => /(\d+(?:[.,]\d+)?)/.test(p));
+
   return ok ? parts.length : 1;
+
 }
+
 function parseRepsValue(raw, steps){
+
   const s = String(raw ?? "").trim();
+
   if(!s) return null;
+
   if(steps<=1){
+
     return clampInt(s);
+
   }
+
   const parts = s.split("-").map(x=>x.trim()).filter(x=>x.length>0);
+
   if(parts.length !== steps) return null;
+
   const nums = parts.map(clampInt);
+
   if(nums.some(n=>n==null)) return null;
+
   return nums.join("-");
+
 }
+
 function repsMeta(val, steps){
+
   if(steps<=1){
+
     const n = (typeof val === "number") ? val : clampInt(val);
+
     if(n==null) return null;
+
     return {parts:[n], prefixKey:"", last:n, str:String(n)};
+
   }
+
   if(typeof val !== "string") return null;
+
   const parts = val.split("-").map(x=>clampInt(x.trim()));
+
   if(parts.length !== steps) return null;
+
   if(parts.some(n=>n==null)) return null;
+
   const last = parts[parts.length-1];
+
   const prefixKey = parts.slice(0,-1).join("-");
+
   return {parts, prefixKey, last, str: parts.join("-")};
+
 }
+
+
 
 /* ===========================
+
    Модель данных
+
 =========================== */
+
 function seedState(){
+
   const mkW = (label) => ({id: nowId(), label, hidden:false});
+
   const mkE = (name, weights, splitLR=false) => ({
+
     id: nowId(), name, archived:false, splitLR,
+
     weights: weights.map(mkW)
+
   });
+
   const mkB = (name, exs) => ({id: nowId(), name, collapsed:false, exercises: exs});
 
+
+
   const w1 = {id: nowId(), date:"02.01.2026"};
+
   const w2 = {id: nowId(), date:"05.01.2026"};
+
   const w3 = {id: nowId(), date:"06.01.2026"};
 
+
+
   const chest = mkB("ГРУДЬ", [
+
     mkE("жим лёжа", ["40","50","60-50"]),
+
     mkE("разводка", ["10","12.5"])
+
   ]);
+
   const biceps = mkB("БИЦЕПС", [
+
     mkE("подъём на бицепс", ["10","12.5"], true)
+
   ]);
+
   const back = mkB("СПИНА", [
+
     mkE("тяга в наклоне", ["40","50"])
+
   ]);
+
   const delts = mkB("ДЕЛЬТЫ", [
+
     mkE("жим стоя", ["20","25"])
+
   ]);
+
   const legs = mkB("НОГИ", [
+
     mkE("присед", ["40","60"])
+
   ]);
+
+
 
   const state = {
+
     theme: "light",
+
     blocks: [chest,biceps,back,delts,legs],
+
     workouts: [w1,w2,w3],
+
     entries: {}
+
   };
+
+
 
   const exBench = chest.exercises[0];
+
   const w40 = exBench.weights.find(x=>x.label==="40").id;
+
   const w50 = exBench.weights.find(x=>x.label==="50").id;
 
+
+
   state.entries[w1.id] = {
+
     [exBench.id]: {
+
       [w40]: {sets:[10,10], injury:false},
+
       [w50]: {sets:[8,8], injury:false}
+
     }
+
   };
+
   state.entries[w2.id] = {
+
     [exBench.id]: {
+
       [w40]: {sets:[11,10], injury:false},
+
       [w50]: {sets:[8,8,7], injury:false}
+
     }
+
   };
+
+
 
   const exCurl = biceps.exercises[0];
+
   const w10 = exCurl.weights.find(x=>x.label==="10").id;
+
   state.entries[w2.id][exCurl.id] = {
+
     [w10]: {
+
       L:{sets:[10,10], injury:false},
+
       R:{sets:[10,9], injury:false}
+
     }
+
   };
 
+
+
   state.workouts = sortWorkoutsAsc(state.workouts);
+
   for(const b of state.blocks){
+
     for(const e of b.exercises){
+
       e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+
     }
+
   }
+
   return state;
+
 }
 
+
+
 function loadState(){
+
   try{
+
     const raw = localStorage.getItem(LS_KEY);
+
     if(!raw) return seedState();
+
     const st = JSON.parse(raw);
+
     if(!st || !Array.isArray(st.blocks) || !Array.isArray(st.workouts) || typeof st.entries!=="object"){
+
       return seedState();
+
     }
+
     st.workouts = sortWorkoutsAsc(st.workouts);
+
     st.theme = st.theme==="dark" ? "dark" : "light";
+
     for(const b of st.blocks){
+
       b.collapsed = !!b.collapsed;
+
       b.exercises = b.exercises || [];
+
       for(const e of b.exercises){
+
         e.archived = !!e.archived;
+
         e.splitLR = !!e.splitLR;
+
         e.weights = e.weights || [];
+
         for(const w of e.weights) w.hidden = !!w.hidden;
+
         e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+
       }
+
     }
+
     return st;
+
   }catch(e){
+
     console.warn("loadState failed", e);
+
     return seedState();
+
   }
+
 }
+
 function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+
 
 let state = loadState();
 
+
+
 /* ===========================
+
    DOM refs
+
 =========================== */
+
 const $ = (sel, root=document) => root.querySelector(sel);
+
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
+
+
 const tableWrap = $("#tableWrap");
+
 const subTitle = $("#subTitle");
 
+
+
 const viewTable = $("#viewTable");
+
 const viewAnalytics = $("#viewAnalytics");
+
 const tabTable = $("#tabTable");
+
 const tabAnalytics = $("#tabAnalytics");
 
+
+
 const overlay = $("#overlay");
+
 const drawer = $("#drawer");
 
+
+
 const cellModalOverlay = $("#cellModalOverlay");
+
 const infoModalOverlay = $("#infoModalOverlay");
 
+
+
 const anBlock = $("#anBlock");
+
 const anExercise = $("#anExercise");
+
 const anMetric = $("#anMetric");
+
 const chart = $("#chart");
+
 const kpiRow = $("#kpiRow");
+
 const insights = $("#insights");
 
+
+
 /* ===========================
+
    Роутинг вкладок
+
 =========================== */
+
 function setTab(name){
+
   const isTable = name==="table";
+
   viewTable.classList.toggle("active", isTable);
+
   viewAnalytics.classList.toggle("active", !isTable);
 
+
+
   tabTable.classList.toggle("active", isTable);
+
   tabAnalytics.classList.toggle("active", !isTable);
+
   tabTable.setAttribute("aria-selected", String(isTable));
+
   tabAnalytics.setAttribute("aria-selected", String(!isTable));
 
+
+
   subTitle.textContent = isTable ? "offline • таблица" : "offline • аналитика";
+
   if(!isTable) renderAnalytics();
+
 }
+
 tabTable.addEventListener("click", ()=>setTab("table"));
+
 tabAnalytics.addEventListener("click", ()=>setTab("analytics"));
 
+
+
 function applyTheme(){ document.documentElement.dataset.theme = state.theme==="dark" ? "dark" : "light"; }
+
 applyTheme();
 
+
+
 function openDrawer(){
+
   overlay.classList.add("show");
+
   drawer.classList.add("show");
+
   refreshMenuSelects();
+
 }
+
 function closeDrawer(){
+
   overlay.classList.remove("show");
+
   drawer.classList.remove("show");
+
 }
+
 $("#btnMenu").addEventListener("click", openDrawer);
+
 $("#btnCloseDrawer").addEventListener("click", closeDrawer);
+
 overlay.addEventListener("click", closeDrawer);
 
+
+
 function showInfo(title, html){
+
   $("#infoTitle").textContent = title;
+
   $("#infoBody").innerHTML = html;
+
   infoModalOverlay.classList.add("show");
+
   infoModalOverlay.setAttribute("aria-hidden","false");
+
 }
+
 function closeInfo(){
+
   infoModalOverlay.classList.remove("show");
+
   infoModalOverlay.setAttribute("aria-hidden","true");
+
 }
+
 $("#btnHelp").addEventListener("click", ()=>{
+
   showInfo("Легенда цветов", `
+
     <div style="display:flex; flex-direction:column; gap:10px">
+
       <div class="legendLine">
+
         <span class="dot gold"></span><b>Рекорд</b><span style="color:var(--muted)">— золотая обводка</span>
+
       </div>
+
       <div class="legendLine">
+
         <span class="dot green"></span><b>Новый вес</b><span style="color:var(--muted)">— зелёная обводка</span>
+
       </div>
+
       <div class="legendLine">
+
         <span class="dot yellow"></span><b>Первый раз упражнение</b><span style="color:var(--muted)">— жёлтая обводка</span>
+
       </div>
+
       <div class="legendLine">
+
         <span class="dot gray"></span><b>Не рекорд</b><span style="color:var(--muted)">— серый фон (когда были прошлые данные)</span>
+
       </div>
+
       <div class="legendLine">
+
         <span class="dot pink"></span><b>Травма</b><span style="color:var(--muted)">— розовый фон (обводка статуса сохраняется)</span>
+
       </div>
+
       <hr style="border:none; border-top:1px solid var(--line)">
+
       <div style="color:var(--muted); font-size:12px">
-        <b>Цель “надо X”</b> показывается только в пустых ячейках самой свежей тренировки (по дате), если уже есть история по этому упражнению+весу. Золотая звездочка ⭐ ставится вручную в редакторе ячейки.
+
+        <b>Цель “надо X”</b> показывается только в пустых ячейках самой свежей тренировки (по дате), если уже есть история по этому упражнению+весу.
+
       </div>
+
     </div>
+
   `);
+
 });
+
 $("#btnCloseInfoModal").addEventListener("click", closeInfo);
+
 $("#btnCloseInfoModal2").addEventListener("click", closeInfo);
 
+
+
 $("#btnTheme").addEventListener("click", ()=>{
+
   state.theme = (state.theme==="dark") ? "light" : "dark";
+
   applyTheme();
+
   saveState();
+
 });
 
-/* ===========================
-   Отрисовка ТАБЛИЦЫ
-=========================== */
-function getCellInfo(workoutId, exerciseId, weightId){
-  const workouts = sortWorkoutsDesc(state.workouts);
-  const workoutIdx = workouts.findIndex(w => w.id === workoutId);
-  if(workoutIdx < 0) return { status: null, prevMax: null, isFirstEx: false, isFirstWeight: false };
+$("#btnExport").addEventListener("click", ()=>{
 
-  const exercise = state.blocks.flatMap(b=>b.exercises).find(e=>e.id === exerciseId);
-  const curEntry = state.entries[workoutId]?.[exerciseId]?.[weightId];
-  
-  const getVol = (ent) => {
-    if(!ent) return 0;
-    if(exercise.splitLR){
-      const l = (ent.L?.sets || []).reduce((a,b)=>a+b,0);
-      const r = (ent.R?.sets || []).reduce((a,b)=>a+b,0);
-      return l + r;
-    }
-    return (ent.sets || []).reduce((a,b)=>a+b,0);
-  };
-  const curVol = getVol(curEntry);
-
-  let hasPrevEx = false;
-  let hasPrevWeight = false;
-  let maxVol = 0;
-  let lastReps = null;
-
-  for(let i = workouts.length - 1; i > workoutIdx; i--){
-    const wId = workouts[i].id;
-    const exEntries = state.entries[wId]?.[exerciseId];
-    if(exEntries){
-      hasPrevEx = true;
-      const wEntry = exEntries[weightId];
-      if(wEntry){
-        hasPrevWeight = true;
-        const v = getVol(wEntry);
-        if(v > maxVol) maxVol = v;
-        
-        if(exercise.splitLR){
-          const l = wEntry.L?.sets || [];
-          const r = wEntry.R?.sets || [];
-          if(l.length || r.length) lastReps = Math.max(...l, ...r);
-        } else {
-          const s = wEntry.sets || [];
-          if(s.length) lastReps = Math.max(...s);
-        }
-      }
-    }
-  }
-
-  if(curVol === 0) return { status: null, prevMax: maxVol, lastReps, isFirstEx: !hasPrevEx, isFirstWeight: !hasPrevWeight };
-
-  if(!hasPrevEx) return { status: STATUS.NEW_EX, prevMax: 0, lastReps:null };
-  if(!hasPrevWeight) return { status: STATUS.NEW_WEIGHT, prevMax: 0, lastReps:null };
-  return {
-    status: (curVol > maxVol) ? STATUS.RECORD : STATUS.NOT_RECORD,
-    prevMax: maxVol,
-    lastReps
-  };
-}
-
-function renderTable(){
-  const workouts = sortWorkoutsDesc(state.workouts);
-  if(!workouts.length){
-    tableWrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Нет тренировок. Нажми "+ тренировка"</div>`;
-    return;
-  }
-
-  let h = `<table><thead><tr><th class="stickyLeft corner">Блоки / Даты</th>`;
-  workouts.forEach(w => {
-    const dObj = parseDDMMYYYY(w.date);
-    const label = dObj ? fmtDate(dObj).split('.').slice(0,2).join('.') : w.date;
-    h += `<th data-id="${w.id}">
-      <div class="dateHead">
-        <span class="d">${label}</span>
-        <button class="trash" onclick="event.stopPropagation(); deleteWorkout('${w.id}')">✕</button>
-      </div>
-    </th>`;
-  });
-  h += `</tr></thead><tbody>`;
-
-  state.blocks.forEach(block => {
-    h += `<tr class="blockRow" data-block-id="${block.id}">
-      <td class="stickyLeft" colspan="${workouts.length + 1}" style="cursor:pointer">
-        <div class="leftCell">
-          <span class="tinyIcon">${block.collapsed ? '▶' : '▼'}</span>
-          <span class="leftText">${block.name}</span>
-        </div>
-      </td>
-    </tr>`;
-
-    if(!block.collapsed){
-      block.exercises.filter(ex => !ex.archived).forEach(ex => {
-        h += `<tr class="exRow">
-          <td class="stickyLeft"><div class="leftCell"><span class="leftText">${ex.name}</span></div></td>
-          <td colspan="${workouts.length}"></td>
-        </tr>`;
-
-        ex.weights.filter(w => !w.hidden).forEach(wObj => {
-          h += `<tr class="wRow">
-            <td class="stickyLeft">
-              <div class="leftCell">
-                <span class="leftText">${wObj.label}</span>
-                <span class="sideTag">${ex.splitLR ? 'L/R' : 'set'}</span>
-              </div>
-            </td>`;
-          
-          workouts.forEach((w, idx) => {
-            const info = getCellInfo(w.id, ex.id, wObj.id);
-            const entry = state.entries[w.id]?.[ex.id]?.[wObj.id];
-            
-            let classes = ["cell"];
-            let valText = "";
-            let subText = "";
-
-            const hasSets = ex.splitLR 
-              ? ((entry?.L?.sets?.length || 0) + (entry?.R?.sets?.length || 0) > 0)
-              : (entry?.sets?.length > 0);
-
-            if(!hasSets){
-              classes.push("empty");
-              if(idx === 0 && info.lastReps !== null){
-                valText = `надо ${info.lastReps}`;
-              }
-              if(entry?.planned) {
-                valText += valText ? " ⭐" : "⭐";
-              }
-            } else {
-              if(info.status === STATUS.RECORD) classes.push("border-gold");
-              else if(info.status === STATUS.NEW_WEIGHT) classes.push("border-green");
-              else if(info.status === STATUS.NEW_EX) classes.push("border-yellow");
-              else if(info.status === STATUS.NOT_RECORD) classes.push("gray");
-
-              const isInjury = ex.splitLR ? (entry.L?.injury || entry.R?.injury) : entry.injury;
-              if(isInjury) classes.push("injury");
-
-              if(ex.splitLR){
-                const l = entry.L?.sets || [];
-                const r = entry.R?.sets || [];
-                valText = "Вес";
-                subText = `L:${l.join('-') || '—'} R:${r.join('-') || '—'}`;
-              } else {
-                valText = (entry.sets || []).join('-');
-                subText = "повторы";
-              }
-            }
-
-            h += `<td class="${classes.join(' ')}" onclick="openCellModal('${w.id}','${ex.id}','${wObj.id}')">
-              <div class="val">${valText}</div>
-              <div class="sub">${subText}</div>
-            </td>`;
-          });
-          h += `</tr>`;
-        });
-      });
-    }
-  });
-
-  h += `</tbody></table>`;
-  tableWrap.innerHTML = h;
-
-  // Сворачивание
-  $$(".blockRow").forEach(row => {
-    row.onclick = () => {
-      const bid = row.dataset.blockId;
-      const b = state.blocks.find(x=>x.id===bid);
-      if(b){ b.collapsed = !b.collapsed; saveState(); renderTable(); }
-    };
-  });
-
-  // Long press для статистики
-  $$("thead th[data-id]").forEach(th => {
-    let timer;
-    const wId = th.dataset.id;
-    const start = () => { timer = setTimeout(()=> showWorkoutStats(wId), 700); };
-    const stop = () => clearTimeout(timer);
-    th.ontouchstart = start; th.ontouchend = stop;
-    th.onmousedown = start; th.onmouseup = stop; th.onmouseleave = stop;
-  });
-}
-
-function showWorkoutStats(wId){
-  const w = state.workouts.find(x=>x.id===wId);
-  if(!w) return;
-  const entries = state.entries[wId] || {};
-  let records = 0, volume = 0, injuries = 0;
-  
-  for(const exId in entries){
-    const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-    if(!ex) continue;
-    for(const wghtId in entries[exId]){
-      const info = getCellInfo(wId, exId, wghtId);
-      if(info.status === STATUS.RECORD) records++;
-      const ent = entries[exId][wghtId];
-      if(ex.splitLR){
-        volume += (ent.L?.sets || []).reduce((a,b)=>a+b,0);
-        volume += (ent.R?.sets || []).reduce((a,b)=>a+b,0);
-        if(ent.L?.injury || ent.R?.injury) injuries++;
-      } else {
-        volume += (ent.sets || []).reduce((a,b)=>a+b,0);
-        if(ent.injury) injuries++;
-      }
-    }
-  }
-  showInfo(`Тренировка ${w.date}`, `
-    <div style="display:flex; flex-direction:column; gap:8px">
-      <div class="kpi"><b>${records}</b><small>Рекордов</small></div>
-      <div class="kpi"><b>${volume}</b><small>Суммарных повторов</small></div>
-      <div class="kpi"><b>${injuries}</b><small>Травм отмечено</small></div>
-    </div>
-  `);
-}
-
-function deleteWorkout(id){
-  if(!confirm("Удалить эту тренировку и всю её историю из таблицы?")) return;
-  state.workouts = state.workouts.filter(w => w.id !== id);
-  delete state.entries[id];
-  saveState(); renderTable();
-}
-
-/* ===========================
-   Модалка ячейки
-=========================== */
-let activeCell = null; // {wId, exId, weightId}
-
-function openCellModal(wId, exId, weightId){
-  activeCell = {wId, exId, weightId};
-  const workout = state.workouts.find(x=>x.id===wId);
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-  const wght = ex.weights.find(w=>w.id===weightId);
-  const entry = state.entries[wId]?.[exId]?.[weightId];
-
-  $("#cellTitle").textContent = ex.name;
-  $("#cellSubtitle").textContent = `${workout.date} • вес ${wght.label}`;
-  
-  const wrap = $("#setsWrap");
-  wrap.innerHTML = "";
-
-  const createSetRow = (val) => {
-    const div = document.createElement("div");
-    div.className = "setRow";
-    div.innerHTML = `<input type="number" value="${val??''}" placeholder="повторы" inputmode="numeric"><button class="btn icon">✕</button>`;
-    div.querySelector("button").onclick = () => div.remove();
-    return div;
-  };
-
-  const addSide = (title, sets) => {
-    const h4 = document.createElement("h4");
-    h4.style.margin = "10px 0 6px 0"; h4.style.fontSize = "12px";
-    h4.textContent = title;
-    wrap.appendChild(h4);
-    const container = document.createElement("div");
-    container.className = "side-container";
-    wrap.appendChild(container);
-    
-    // Если сетов нет, добавляем один пустой сразу
-    if(!sets || sets.length === 0){
-      container.appendChild(createSetRow(""));
-    } else {
-      sets.forEach(s => container.appendChild(createSetRow(s)));
-    }
-  };
-
-  if(ex.splitLR){
-    addSide("Левая (L)", entry?.L?.sets);
-    addSide("Правая (R)", entry?.R?.sets);
-  } else {
-    addSide("Сеты", entry?.sets);
-  }
-
-  const isInjury = ex.splitLR ? (entry?.L?.injury || entry?.R?.injury) : entry?.injury;
-  $("#btnToggleInjury").textContent = isInjury ? "Вкл" : "Выкл";
-  $("#btnToggleInjury").onclick = () => {
-    const now = $("#btnToggleInjury").textContent === "Вкл";
-    $("#btnToggleInjury").textContent = now ? "Выкл" : "Вкл";
-  };
-
-  // ПЛАН (ЗВЕЗДА)
-  const isPlanned = !!entry?.planned;
-  $("#btnTogglePlanned").textContent = isPlanned ? "Вкл" : "Выкл";
-  $("#btnTogglePlanned").onclick = () => {
-    const now = $("#btnTogglePlanned").textContent === "Вкл";
-    $("#btnTogglePlanned").textContent = now ? "Выкл" : "Вкл";
-  };
-
-  cellModalOverlay.classList.add("show");
-  cellModalOverlay.setAttribute("aria-hidden","false");
-}
-
-$("#btnAddSet").onclick = () => {
-  $$(".side-container").forEach(c => {
-    const row = document.createElement("div");
-    row.className = "setRow";
-    row.innerHTML = `<input type="number" placeholder="повторы" inputmode="numeric"><button class="btn icon">✕</button>`;
-    row.querySelector("button").onclick = () => row.remove();
-    c.appendChild(row);
-    row.querySelector("input").focus();
-  });
-};
-$("#btnClearSets").onclick = () => {
-  $$(".setRow").forEach(r => r.remove());
-};
-
-function closeCellModal(){
-  cellModalOverlay.classList.remove("show");
-  cellModalOverlay.setAttribute("aria-hidden","true");
-  activeCell = null;
-}
-$("#btnCloseCellModal").onclick = closeCellModal;
-$("#btnCancelCell").onclick = closeCellModal;
-
-$("#btnSaveCell").onclick = () => {
-  if(!activeCell) return;
-  const {wId, exId, weightId} = activeCell;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-  
-  const isInjury = $("#btnToggleInjury").textContent === "Вкл";
-  const isPlanned = $("#btnTogglePlanned").textContent === "Вкл";
-  
-  const containers = $$(".side-container");
-  const getSets = (c) => $$( "input", c).map(i => clampInt(i.value)).filter(v=>v!==null);
-
-  if(!state.entries[wId]) state.entries[wId] = {};
-  if(!state.entries[wId][exId]) state.entries[wId][exId] = {};
-
-  if(ex.splitLR){
-    state.entries[wId][exId][weightId] = {
-      L: { sets: getSets(containers[0]), injury: isInjury },
-      R: { sets: getSets(containers[1]), injury: isInjury },
-      planned: isPlanned
-    };
-  } else {
-    state.entries[wId][exId][weightId] = {
-      sets: getSets(containers[0]),
-      injury: isInjury,
-      planned: isPlanned
-    };
-  }
-  
-  saveState(); renderTable(); closeCellModal();
-};
-
-/* ===========================
-   Управление (Drawer)
-=========================== */
-function refreshMenuSelects(){
-  const bSel = $("#selBlockAddEx");
-  bSel.innerHTML = state.blocks.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-  
-  const eSel1 = $("#selExAddWeight");
-  const eSel2 = $("#selManageExercise");
-  const exs = state.blocks.flatMap(b=>b.exercises);
-  const opts = exs.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
-  eSel1.innerHTML = opts; eSel2.innerHTML = opts;
-  refreshWeightsManage();
-}
-
-function refreshWeightsManage(){
-  const eId = $("#selManageExercise").value;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
-  const list = $("#weightsList");
-  if(!ex){ list.innerHTML = ""; return; }
-  list.innerHTML = ex.weights.map(w => `
-    <div class="toggleLine" style="margin-top:4px; padding:6px 10px">
-      <span style="font-weight:600">${w.label}</span>
-      <div class="rowActions">
-        <button class="btn" onclick="toggleWeightHidden('${ex.id}','${w.id}')">${w.hidden?'Показать':'Скрыть'}</button>
-      </div>
-    </div>
-  `).join('');
-}
-$("#selManageExercise").onchange = refreshWeightsManage;
-
-window.toggleWeightHidden = (exId, wId) => {
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-  const w = ex.weights.find(x=>x.id===wId);
-  if(w){ w.hidden = !w.hidden; saveState(); refreshWeightsManage(); renderTable(); }
-};
-
-$("#btnAddWorkout").onclick = () => {
-  const d = prompt("Дата новой тренировки (ДД.ММ.ГГГГ):", fmtDate(new Date()));
-  if(!d) return;
-  if(!parseDDMMYYYY(d)){ alert("Неверный формат даты"); return; }
-  state.workouts.push({ id: nowId(), date: d });
-  state.workouts = sortWorkoutsAsc(state.workouts);
-  saveState(); renderTable();
-};
-
-$("#btnAddExercise").onclick = () => {
-  const bId = $("#selBlockAddEx").value;
-  const name = $("#inExName").value.trim();
-  if(!name) return;
-  const b = state.blocks.find(x=>x.id===bId);
-  b.exercises.push({ id: nowId(), name, archived:false, splitLR:false, weights:[] });
-  $("#inExName").value = "";
-  saveState(); refreshMenuSelects(); renderTable();
-};
-
-$("#btnAddWeight").onclick = () => {
-  const eId = $("#selExAddWeight").value;
-  const label = $("#inWeightLabel").value.trim();
-  if(!label) return;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
-  ex.weights.push({ id: nowId(), label, hidden:false });
-  ex.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
-  $("#inWeightLabel").value = "";
-  saveState(); refreshMenuSelects(); renderTable();
-};
-
-$("#btnToggleSplit").onclick = () => {
-  const eId = $("#selManageExercise").value;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
-  if(ex){ ex.splitLR = !ex.splitLR; saveState(); renderTable(); }
-};
-$("#btnToggleArchive").onclick = () => {
-  const eId = $("#selManageExercise").value;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
-  if(ex){ ex.archived = !ex.archived; saveState(); renderTable(); refreshMenuSelects(); }
-};
-$("#btnDeleteExercise").onclick = () => {
-  const eId = $("#selManageExercise").value;
-  if(!confirm("Удалить упражнение НАВСЕГДА вместе со всей историей?")) return;
-  for(const b of state.blocks){
-    const idx = b.exercises.findIndex(x=>x.id===eId);
-    if(idx!==-1){
-      b.exercises.splice(idx,1);
-      for(const wId in state.entries){ delete state.entries[wId][eId]; }
-      break;
-    }
-  }
-  saveState(); renderTable(); refreshMenuSelects();
-};
-
-$("#btnReset").onclick = () => {
-  if(confirm("Сбросить все данные и загрузить пример?")){
-    state = seedState(); saveState(); location.reload();
-  }
-};
-
-$("#btnExport").onclick = () => {
   const json = JSON.stringify(state, null, 2);
-  showInfo("Экспорт JSON", `<textarea id="exportArea" style="width:100%;height:200px;font-size:10px">${json}</textarea>
-    <button class="btn primary" style="margin-top:10px" onclick="copyExp()">Копировать</button>`);
-};
-window.copyExp = () => { const a=$("#exportArea"); a.select(); document.execCommand("copy"); };
 
-$("#btnImport").onclick = () => {
-  showInfo("Импорт JSON", `<textarea id="importArea" style="width:100%;height:200px;font-size:10px" placeholder="Вставь JSON сюда..."></textarea>
-    <button class="btn danger" style="margin-top:10px" onclick="doImp()">Загрузить</button>`);
-};
-window.doImp = () => {
-  try {
-    const obj = JSON.parse($("#importArea").value);
-    localStorage.setItem(LS_KEY, JSON.stringify(obj));
-    location.reload();
-  } catch(e){ alert("Ошибка в JSON"); }
-};
+  showInfo("Экспорт JSON", `
 
-/* ===========================
-   Аналитика
-=========================== */
-function renderAnalytics(){
-  const blocks = state.blocks;
-  anBlock.innerHTML = `<option value="ALL">Все блоки</option>` + blocks.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
-  
-  const updateExs = () => {
-    const bId = anBlock.value;
-    const exs = (bId==="ALL") ? blocks.flatMap(b=>b.exercises) : blocks.find(b=>b.id===bId).exercises;
-    anExercise.innerHTML = `<option value="ALL">Все упр-я</option>` + exs.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
-    drawChart();
-  };
-  anBlock.onchange = updateExs;
-  anExercise.onchange = drawChart;
-  anMetric.onchange = drawChart;
-  updateExs();
-}
+    <div style="display:flex; flex-direction:column; gap:10px">
 
-function drawChart(){
-  const bId = anBlock.value;
-  const eId = anExercise.value;
-  const metric = anMetric.value;
-  const workouts = sortWorkoutsAsc(state.workouts);
-  
-  const data = workouts.map(w => {
-    let val = 0;
-    const entries = state.entries[w.id] || {};
-    
-    const countMetric = (exId, weightId, entry) => {
-      const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-      if(!ex) return 0;
-      if(metric==="volume"){
-        if(ex.splitLR){
-          return ((entry.L?.sets || []).reduce((a,b)=>a+b,0) + (entry.R?.sets || []).reduce((a,b)=>a+b,0));
-        }
-        return (entry.sets || []).reduce((a,b)=>a+b,0);
-      }
-      if(metric==="reps"){
-        if(ex.splitLR) return (entry.L?.sets?.length||0) + (entry.R?.sets?.length||0);
-        return entry.sets?.length || 0;
-      }
-      if(metric==="records"){
-        return getCellInfo(w.id, exId, weightId).status === STATUS.RECORD ? 1 : 0;
-      }
-      if(metric==="injuries"){
-        if(ex.splitLR) return (entry.L?.injury || entry.R?.injury) ? 1 : 0;
-        return entry.injury ? 1 : 0;
-      }
-      return 0;
-    };
+      <div style="color:var(--muted); font-size:12px">Скопируй и сохрани где-нибудь. Это твой бэкап.</div>
 
-    if(eId !== "ALL"){
-      for(const wghtId in entries[eId]||{}) val += countMetric(eId, wghtId, entries[eId][wghtId]);
-    } else if(bId !== "ALL"){
-      const bExs = state.blocks.find(b=>b.id===bId).exercises;
-      bExs.forEach(ex => {
-        for(const wghtId in entries[ex.id]||{}) val += countMetric(ex.id, wghtId, entries[ex.id][wghtId]);
+      <textarea id="exportArea" style="width:100%; height:260px; padding:10px; border-radius:14px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px"></textarea>
+
+      <div class="rowActions">
+
+        <button class="btn primary" id="btnCopyExport">Скопировать</button>
+
+      </div>
+
+    </div>
+
+  `);
+
+  setTimeout(()=>{
+
+    const ta = $("#exportArea");
+
+    if(ta){ ta.value = json; ta.focus(); ta.select(); }
+
+    const btn = $("#btnCopyExport");
+
+    if(btn){
+
+      btn.addEventListener("click", ()=>{
+
+        ta.select();
+
+        document.execCommand("copy");
+
+        btn.textContent = "Скопировано ✓";
+
+        setTimeout(()=>btn.textContent="Скопировать", 1200);
+
       });
-    } else {
-      for(const exKey in entries){
-        for(const wghtId in entries[exKey]){
-          val += countMetric(exKey, wghtId, entries[exKey][wghtId]);
-        }
-      }
+
     }
-    return val;
-  });
 
-  const ctx = chart.getContext("2d");
-  ctx.clearRect(0,0,chart.width,chart.height);
-  const max = Math.max(...data, 10);
-  const pad = 40;
-  const w = chart.width - pad*2;
-  const h = chart.height - pad*2;
-  const stepX = w / (data.length-1 || 1);
+  },0);
 
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--line');
-  ctx.beginPath();
-  for(let i=0; i<=5; i++){
-    const y = pad + h - (i/5)*h;
-    ctx.moveTo(pad, y); ctx.lineTo(pad+w, y);
-  }
-  ctx.stroke();
+});
 
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  data.forEach((v,i) => {
-    const x = pad + i*stepX;
-    const y = pad + h - (v/max)*h;
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  });
-  ctx.stroke();
+$("#btnImport").addEventListener("click", ()=>{
 
-  // KPIs
-  const total = data.reduce((a,b)=>a+b,0);
-  const avg = (total/data.length).toFixed(1);
-  kpiRow.innerHTML = `
-    <div class="kpi"><b>${total}</b><small>Всего за период</small></div>
-    <div class="kpi"><b>${avg}</b><small>Среднее</small></div>
-    <div class="kpi"><b>${Math.max(...data)}</b><small>Пик</small></div>
-  `;
-}
+  showInfo("Импорт JSON", `
 
-// Start
-renderTable();
-</script>
-</body>
-</html>
+    <div style="display:flex; flex-direction:column; gap:10px">
+
+      <div style="color:var(--muted); font-size:12px">
+
+        Вставь JSON. Импорт <b>перезапишет</b> текущие данные.
+
+      </div>
+
+      <textarea id="importArea" style="width:100%; height:260px; padding:10px; border-radius:14px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px"></textarea>
+
+      <div class="rowActions">
+
+        <button class="btn danger" id="btnDoImport">Импортировать</button>
+
+      </div>
+
+    </div>
+
+  `);
+
+  setTimeout(()=>{
+
+    const btn = $("#btnDoImport");
+
+    const ta = $("#importArea");
+
+    if(btn && ta){
+
+      btn.addEventListener("click", ()=>{
+
+        try{
+
+          const obj = JSON.parse(ta.value);
+
+          localStorage.setItem(LS_KEY, JSON.stringify(obj));
+
+          state = loadState();
+
+          applyTheme();
+
+          renderAll();
+
+          closeInfo();
+
+          closeDrawer();
+
+        }catch(e){
+
+          alert("Не
