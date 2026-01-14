@@ -26,6 +26,7 @@
     [data-theme="dark"]{
       --bg:#0b1220; --fg:#e5e7eb; --muted:#9aa7bd; --line:#1f2a44;
       --card:#0f172a; --card2:#111c33;
+      --accent:#60a5fa; --danger:#f87171;
       --shadow: 0 10px 30px rgba(0,0,0,.35);
       --stickyBg: rgba(11,18,32,.88);
 
@@ -105,6 +106,7 @@
       white-space:nowrap;
     }
 
+    /* закрепление заголовка дат */
     thead{
       position:sticky;
       top:0;
@@ -148,12 +150,14 @@
       background:var(--card);flex:0 0 auto;
     }
 
+    /* перенос названий упражнений */
     .exRow td{height:auto;white-space:normal;}
     .exRow .stickyLeft{white-space:normal;}
     .exRow .leftText{
       white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;
     }
 
+    /* перенос весов */
     .wRow td{height:auto;white-space:normal;}
     .wRow .stickyLeft{white-space:normal;}
     .wRow .leftText{
@@ -183,9 +187,6 @@
       font-weight:800;
       font-size:13px;
       line-height:1.1;
-      display: flex;
-      align-items: center;
-      gap: 4px;
     }
     td.cell .sub{
       font-size:11px;color:var(--muted);
@@ -193,8 +194,10 @@
       overflow:hidden;text-overflow:ellipsis;
     }
 
+    /* ===== ИЗМЕНЕНО: цели (надо X) не жирные; повторы — жирные и чёрные ===== */
     td.cell.empty .val{color:var(--muted);font-weight:400}
     td.cell:not(.empty) .sub{color:var(--fg);font-weight:800}
+    /* ===== конец изменений ===== */
 
     td.cell.empty .sub{display:none}
 
@@ -304,7 +307,7 @@
     }
     .toggleLine .left{display:flex;align-items:center;gap:10px}
     .badge{
-      font-size:12px;padding:4px 8px;border-radius:9999px;
+      font-size:12px;padding:4px 8px;border-radius:999px;
       border:1px solid var(--line);background:var(--bg);color:var(--muted);
     }
 
@@ -442,6 +445,9 @@
       <div class="rowActions">
         <button class="btn primary" id="btnAddExercise">Добавить</button>
       </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Упражнения можно архивировать, чтобы не мешали, но история останется.
+      </div>
     </div>
 
     <div class="section">
@@ -456,6 +462,9 @@
       </div>
       <div class="rowActions">
         <button class="btn primary" id="btnAddWeight">Добавить вес</button>
+      </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Веса сортируются по возрастанию. “60-50” ставится по максимальному числу (60).
       </div>
     </div>
 
@@ -496,6 +505,9 @@
       <div style="margin-top:12px" class="rowActions">
         <button class="btn danger" id="btnDeleteExercise">Удалить навсегда…</button>
       </div>
+      <div style="margin-top:6px; color:var(--muted); font-size:12px">
+        Удаление уничтожает историю. Архив обычно лучше.
+      </div>
     </div>
 
     <div class="section">
@@ -504,6 +516,9 @@
         <button class="btn" id="btnExport">Экспорт JSON</button>
         <button class="btn" id="btnImport">Импорт JSON</button>
         <button class="btn danger" id="btnReset">Сброс (seed)</button>
+      </div>
+      <div style="margin-top:8px; color:var(--muted); font-size:12px">
+        Всё хранится в LocalStorage. Импорт перезаписывает данные.
       </div>
     </div>
   </div>
@@ -530,7 +545,7 @@
           <span class="badge">⭐</span>
           <div>
             <b style="display:block">План (звезда)</b>
-            <small style="color:var(--muted)">Пометка для тренировки</small>
+            <small style="color:var(--muted)">Пометка на текущую тренировку</small>
           </div>
         </div>
         <button class="btn" id="btnTogglePlanned">Выкл</button>
@@ -541,7 +556,7 @@
           <span class="badge">🩹</span>
           <div>
             <b style="display:block">Травма</b>
-            <small style="color:var(--muted)">Розовый фон</small>
+            <small style="color:var(--muted)">Розовый фон, но статусная обводка сохраняется</small>
           </div>
         </div>
         <button class="btn" id="btnToggleInjury">Выкл</button>
@@ -568,6 +583,9 @@
 </div>
 
 <script>
+/* ===========================
+   Константы + утилиты
+=========================== */
 const LS_KEY = "gymProgress.v1";
 const DEFAULT_BLOCKS = ["ГРУДЬ","БИЦЕПС","СПИНА","ДЕЛЬТЫ","НОГИ"];
 
@@ -607,6 +625,13 @@ function sortWorkoutsAsc(workouts){
     return ta-tb;
   });
 }
+function sortWorkoutsDesc(workouts){
+  return [...workouts].sort((a,b)=>{
+    const da = parseDDMMYYYY(a.date), db = parseDDMMYYYY(b.date);
+    const ta = da?da.getTime():0, tb = db?db.getTime():0;
+    return tb-ta;
+  });
+}
 
 function weightMaxNumber(label){
   const s = String(label||"").trim();
@@ -619,25 +644,26 @@ function weightMaxNumber(label){
   }
   return Number.isFinite(max) ? max : Number.POSITIVE_INFINITY;
 }
-
 function weightStepsFromLabel(weightLabel){
   const s = String(weightLabel||"").trim();
   if(!s.includes("-")) return 1;
   const parts = s.split("-").map(x=>x.trim()).filter(Boolean);
-  return parts.length >= 2 ? parts.length : 1;
+  if(parts.length < 2) return 1;
+  const ok = parts.every(p => /(\d+(?:[.,]\d+)?)/.test(p));
+  return ok ? parts.length : 1;
 }
-
 function parseRepsValue(raw, steps){
   const s = String(raw ?? "").trim();
   if(!s) return null;
-  if(steps<=1) return clampInt(s);
+  if(steps<=1){
+    return clampInt(s);
+  }
   const parts = s.split("-").map(x=>x.trim()).filter(x=>x.length>0);
   if(parts.length !== steps) return null;
   const nums = parts.map(clampInt);
   if(nums.some(n=>n==null)) return null;
   return nums.join("-");
 }
-
 function repsMeta(val, steps){
   if(steps<=1){
     const n = (typeof val === "number") ? val : clampInt(val);
@@ -646,12 +672,16 @@ function repsMeta(val, steps){
   }
   if(typeof val !== "string") return null;
   const parts = val.split("-").map(x=>clampInt(x.trim()));
-  if(parts.length !== steps || parts.some(n=>n==null)) return null;
+  if(parts.length !== steps) return null;
+  if(parts.some(n=>n==null)) return null;
   const last = parts[parts.length-1];
   const prefixKey = parts.slice(0,-1).join("-");
   return {parts, prefixKey, last, str: parts.join("-")};
 }
 
+/* ===========================
+   Модель данных
+=========================== */
 function seedState(){
   const mkW = (label) => ({id: nowId(), label, hidden:false});
   const mkE = (name, weights, splitLR=false) => ({
@@ -662,18 +692,64 @@ function seedState(){
 
   const w1 = {id: nowId(), date:"02.01.2026"};
   const w2 = {id: nowId(), date:"05.01.2026"};
+  const w3 = {id: nowId(), date:"06.01.2026"};
 
-  const chest = mkB("ГРУДЬ", [mkE("жим лёжа", ["40","50","60-50"])]);
-  const biceps = mkB("БИЦЕПС", [mkE("подъём на бицепс", ["10"], true)]);
-  
+  const chest = mkB("ГРУДЬ", [
+    mkE("жим лёжа", ["40","50","60-50"]),
+    mkE("разводка", ["10","12.5"])
+  ]);
+  const biceps = mkB("БИЦЕПС", [
+    mkE("подъём на бицепс", ["10","12.5"], true)
+  ]);
+  const back = mkB("СПИНА", [
+    mkE("тяга в наклоне", ["40","50"])
+  ]);
+  const delts = mkB("ДЕЛЬТЫ", [
+    mkE("жим стоя", ["20","25"])
+  ]);
+  const legs = mkB("НОГИ", [
+    mkE("присед", ["40","60"])
+  ]);
+
   const state = {
     theme: "light",
-    blocks: [chest, biceps],
-    workouts: [w1, w2],
+    blocks: [chest,biceps,back,delts,legs],
+    workouts: [w1,w2,w3],
     entries: {}
   };
 
+  const exBench = chest.exercises[0];
+  const w40 = exBench.weights.find(x=>x.label==="40").id;
+  const w50 = exBench.weights.find(x=>x.label==="50").id;
+
+  state.entries[w1.id] = {
+    [exBench.id]: {
+      [w40]: {sets:[10,10], injury:false},
+      [w50]: {sets:[8,8], injury:false}
+    }
+  };
+  state.entries[w2.id] = {
+    [exBench.id]: {
+      [w40]: {sets:[11,10], injury:false},
+      [w50]: {sets:[8,8,7], injury:false}
+    }
+  };
+
+  const exCurl = biceps.exercises[0];
+  const w10 = exCurl.weights.find(x=>x.label==="10").id;
+  state.entries[w2.id][exCurl.id] = {
+    [w10]: {
+      L:{sets:[10,10], injury:false},
+      R:{sets:[10,9], injury:false}
+    }
+  };
+
   state.workouts = sortWorkoutsAsc(state.workouts);
+  for(const b of state.blocks){
+    for(const e of b.exercises){
+      e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+    }
+  }
   return state;
 }
 
@@ -682,316 +758,483 @@ function loadState(){
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return seedState();
     const st = JSON.parse(raw);
-    st.workouts = sortWorkoutsAsc(st.workouts || []);
+    if(!st || !Array.isArray(st.blocks) || !Array.isArray(st.workouts) || typeof st.entries!=="object"){
+      return seedState();
+    }
+    st.workouts = sortWorkoutsAsc(st.workouts);
+    st.theme = st.theme==="dark" ? "dark" : "light";
+    for(const b of st.blocks){
+      b.collapsed = !!b.collapsed;
+      b.exercises = b.exercises || [];
+      for(const e of b.exercises){
+        e.archived = !!e.archived;
+        e.splitLR = !!e.splitLR;
+        e.weights = e.weights || [];
+        for(const w of e.weights) w.hidden = !!w.hidden;
+        e.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
+      }
+    }
     return st;
-  }catch(e){ return seedState(); }
+  }catch(e){
+    console.warn("loadState failed", e);
+    return seedState();
+  }
 }
 function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
 let state = loadState();
 
+/* ===========================
+   DOM refs
+=========================== */
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
 const tableWrap = $("#tableWrap");
 const subTitle = $("#subTitle");
+
 const viewTable = $("#viewTable");
 const viewAnalytics = $("#viewAnalytics");
 const tabTable = $("#tabTable");
 const tabAnalytics = $("#tabAnalytics");
+
 const overlay = $("#overlay");
 const drawer = $("#drawer");
+
 const cellModalOverlay = $("#cellModalOverlay");
 const infoModalOverlay = $("#infoModalOverlay");
 
+const anBlock = $("#anBlock");
+const anExercise = $("#anExercise");
+const anMetric = $("#anMetric");
+const chart = $("#chart");
+const kpiRow = $("#kpiRow");
+const insights = $("#insights");
+
+/* ===========================
+   Роутинг вкладок
+=========================== */
 function setTab(name){
   const isTable = name==="table";
   viewTable.classList.toggle("active", isTable);
   viewAnalytics.classList.toggle("active", !isTable);
+
   tabTable.classList.toggle("active", isTable);
   tabAnalytics.classList.toggle("active", !isTable);
+  tabTable.setAttribute("aria-selected", String(isTable));
+  tabAnalytics.setAttribute("aria-selected", String(!isTable));
+
+  subTitle.textContent = isTable ? "offline • таблица" : "offline • аналитика";
   if(!isTable) renderAnalytics();
 }
 tabTable.addEventListener("click", ()=>setTab("table"));
 tabAnalytics.addEventListener("click", ()=>setTab("analytics"));
 
-function applyTheme(){ document.documentElement.dataset.theme = state.theme; }
+function applyTheme(){ document.documentElement.dataset.theme = state.theme==="dark" ? "dark" : "light"; }
 applyTheme();
 
-function openDrawer(){ overlay.classList.add("show"); drawer.classList.add("show"); refreshMenuSelects(); }
-function closeDrawer(){ overlay.classList.remove("show"); drawer.classList.remove("show"); }
+function openDrawer(){
+  overlay.classList.add("show");
+  drawer.classList.add("show");
+  refreshMenuSelects();
+}
+function closeDrawer(){
+  overlay.classList.remove("show");
+  drawer.classList.remove("show");
+}
 $("#btnMenu").addEventListener("click", openDrawer);
 $("#btnCloseDrawer").addEventListener("click", closeDrawer);
 overlay.addEventListener("click", closeDrawer);
 
-function renderAll(){
-  const workouts = state.workouts;
-  if(!workouts.length){
-    tableWrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Нет тренировок. Нажми "+ тренировка"</div>`;
-    return;
-  }
-
-  let html = `<table><thead><tr><th class="stickyLeft corner">Упражнение</th>`;
-  workouts.forEach(w => {
-    html += `<th><div class="dateHead"><span class="d">${w.date.split('.').slice(0,2).join('.')}</span>
-            <button class="trash" onclick="deleteWorkout('${w.id}')">✕</button></div></th>`;
-  });
-  html += `</tr></thead><tbody>`;
-
-  state.blocks.forEach(block => {
-    html += `<tr class="blockRow"><td class="stickyLeft" colspan="${workouts.length+1}">
-            <div class="leftCell"><span class="leftText">${block.name}</span></div></td></tr>`;
-    
-    block.exercises.filter(ex => !ex.archived).forEach(ex => {
-      html += `<tr class="exRow"><td class="stickyLeft"><div class="leftCell"><span class="leftText">${ex.name}</span></div></td>
-              <td colspan="${workouts.length}"></td></tr>`;
-      
-      ex.weights.filter(w => !w.hidden).forEach(wObj => {
-        html += `<tr class="wRow"><td class="stickyLeft"><div class="leftCell"><span class="leftText">${wObj.label}</span>
-                <span class="sideTag">${ex.splitLR?'L/R':'set'}</span></div></td>`;
-        
-        workouts.forEach((w, wIdx) => {
-          const entry = state.entries[w.id]?.[ex.id]?.[wObj.id];
-          const isLastWorkout = (wIdx === workouts.length - 1);
-          const cellData = getCellDisplay(entry, ex, wObj, w.id, isLastWorkout);
-          
-          html += `<td class="cell ${cellData.classes}" onclick="openCellModal('${w.id}','${ex.id}','${wObj.id}')">
-                  <div class="val">${cellData.val}</div><div class="sub">${cellData.sub}</div></td>`;
-        });
-        html += `</tr>`;
-      });
-    });
-  });
-
-  html += `</tbody></table>`;
-  tableWrap.innerHTML = html;
+function showInfo(title, html){
+  $("#infoTitle").textContent = title;
+  $("#infoBody").innerHTML = html;
+  infoModalOverlay.classList.add("show");
+  infoModalOverlay.setAttribute("aria-hidden","false");
 }
+function closeInfo(){
+  infoModalOverlay.classList.remove("show");
+  infoModalOverlay.setAttribute("aria-hidden","true");
+}
+$("#btnHelp").addEventListener("click", ()=>{
+  showInfo("Легенда цветов", `
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div class="legendLine">
+        <span class="dot gold"></span><b>Рекорд</b><span style="color:var(--muted)">— золотая обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot green"></span><b>Новый вес</b><span style="color:var(--muted)">— зелёная обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot yellow"></span><b>Первый раз упражнение</b><span style="color:var(--muted)">— жёлтая обводка</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot gray"></span><b>Не рекорд</b><span style="color:var(--muted)">— серый фон (когда были прошлые данные)</span>
+      </div>
+      <div class="legendLine">
+        <span class="dot pink"></span><b>Травма</b><span style="color:var(--muted)">— розовый фон (обводка статуса сохраняется)</span>
+      </div>
+      <hr style="border:none; border-top:1px solid var(--line)">
+      <div style="color:var(--muted); font-size:12px">
+        <b>Цель “надо X”</b> показывается только в пустых ячейках самой свежей тренировки (по дате), если уже есть история по этому упражнению+весу. Золотая звездочка ⭐ ставится вручную в редакторе ячейки.
+      </div>
+    </div>
+  `);
+});
+$("#btnCloseInfoModal").addEventListener("click", closeInfo);
+$("#btnCloseInfoModal2").addEventListener("click", closeInfo);
 
-function getCellDisplay(entry, ex, wObj, workoutId, isLastWorkout){
-  let classes = "";
-  let val = "";
-  let sub = "";
+$("#btnTheme").addEventListener("click", ()=>{
+  state.theme = (state.theme==="dark") ? "light" : "dark";
+  applyTheme();
+  saveState();
+});
+
+/* ===========================
+   Отрисовка ТАБЛИЦЫ
+=========================== */
+function getCellInfo(workoutId, exerciseId, weightId){
+  const workouts = sortWorkoutsDesc(state.workouts);
+  const workoutIdx = workouts.findIndex(w => w.id === workoutId);
+  if(workoutIdx < 0) return { status: null, prevMax: null, isFirstEx: false, isFirstWeight: false };
+
+  const exercise = state.blocks.flatMap(b=>b.exercises).find(e=>e.id === exerciseId);
+  const curEntry = state.entries[workoutId]?.[exerciseId]?.[weightId];
   
-  const hasData = entry && (ex.splitLR ? (entry.L?.sets.length || entry.R?.sets.length) : entry.sets?.length);
-
-  if(!hasData){
-    classes = "empty";
-    // Если ячейка в последней тренировке помечена как "планируемая"
-    if(entry?.planned) {
-      val += ` ⭐`;
-    }
-    
-    // Пытаемся найти подсказку "надо X"
-    const target = getTargetReps(workoutId, ex.id, wObj.id);
-    if(target && isLastWorkout){
-      val = `надо ${target}` + val;
-    } else if (val === " ⭐") {
-      val = "План ⭐";
-    }
-  } else {
-    const status = getEntryStatus(workoutId, ex.id, wObj.id);
-    if(status === STATUS.RECORD) classes += " border-gold";
-    else if(status === STATUS.NEW_WEIGHT) classes += " border-green";
-    else if(status === STATUS.NEW_EX) classes += " border-yellow";
-    else if(status === STATUS.NOT_RECORD) classes += " gray";
-
-    const isInjury = ex.splitLR ? (entry.L?.injury || entry.R?.injury) : entry.injury;
-    if(isInjury) classes += " injury";
-
-    if(ex.splitLR){
-      const lReps = entry.L?.sets.join('-') || "";
-      const rReps = entry.R?.sets.join('-') || "";
-      sub = lReps || rReps ? `L:${lReps || '—'} R:${rReps || '—'}` : "";
-      val = lReps || rReps ? "Вес" : "";
-    } else {
-      val = entry.sets.join('-');
-      sub = "повторы";
-    }
-  }
-  return { classes, val, sub };
-}
-
-function getTargetReps(workoutId, exId, weightId){
-  const workouts = state.workouts;
-  const idx = workouts.findIndex(w => w.id === workoutId);
-  if(idx <= 0) return null;
-  
-  for(let i = idx-1; i >= 0; i--){
-    const e = state.entries[workouts[i].id]?.[exId]?.[weightId];
-    if(e){
-      const ex = state.blocks.flatMap(b=>b.exercises).find(x=>x.id===exId);
-      if(ex.splitLR){
-        const lMax = e.L?.sets.length ? Math.max(...e.L.sets) : 0;
-        const rMax = e.R?.sets.length ? Math.max(...e.R.sets) : 0;
-        return lMax || rMax ? Math.max(lMax, rMax) : null;
-      } else {
-        return e.sets?.length ? Math.max(...e.sets) : null;
-      }
-    }
-  }
-  return null;
-}
-
-function getEntryStatus(workoutId, exId, weightId){
-  const workouts = state.workouts;
-  const idx = workouts.findIndex(w => w.id === workoutId);
-  const entry = state.entries[workoutId]?.[exId]?.[weightId];
-  if(!entry) return null;
-
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
   const getVol = (ent) => {
     if(!ent) return 0;
-    if(ex.splitLR){
+    if(exercise.splitLR){
       const l = (ent.L?.sets || []).reduce((a,b)=>a+b,0);
       const r = (ent.R?.sets || []).reduce((a,b)=>a+b,0);
       return l + r;
     }
     return (ent.sets || []).reduce((a,b)=>a+b,0);
   };
+  const curVol = getVol(curEntry);
 
-  const currentVol = getVol(entry);
-  if(currentVol === 0) return null;
+  let hasPrevEx = false;
+  let hasPrevWeight = false;
+  let maxVol = 0;
+  let lastReps = null;
 
-  let hasHistoryForWeight = false;
-  let hasHistoryForEx = false;
-  let maxPrevVol = 0;
-
-  for(let i=0; i<idx; i++){
-    const prevWorkoutEntries = state.entries[workouts[i].id];
-    if(!prevWorkoutEntries) continue;
-    
-    if(prevWorkoutEntries[exId]){
-      hasHistoryForEx = true;
-      const prevEntry = prevWorkoutEntries[exId][weightId];
-      if(prevEntry){
-        hasHistoryForWeight = true;
-        maxPrevVol = Math.max(maxPrevVol, getVol(prevEntry));
+  for(let i = workouts.length - 1; i > workoutIdx; i--){
+    const wId = workouts[i].id;
+    const exEntries = state.entries[wId]?.[exerciseId];
+    if(exEntries){
+      hasPrevEx = true;
+      const wEntry = exEntries[weightId];
+      if(wEntry){
+        hasPrevWeight = true;
+        const v = getVol(wEntry);
+        if(v > maxVol) maxVol = v;
+        
+        if(exercise.splitLR){
+          const l = wEntry.L?.sets || [];
+          const r = wEntry.R?.sets || [];
+          if(l.length || r.length) lastReps = Math.max(...l, ...r);
+        } else {
+          const s = wEntry.sets || [];
+          if(s.length) lastReps = Math.max(...s);
+        }
       }
     }
   }
 
-  if(!hasHistoryForEx) return STATUS.NEW_EX;
-  if(!hasHistoryForWeight) return STATUS.NEW_WEIGHT;
-  return currentVol > maxPrevVol ? STATUS.RECORD : STATUS.NOT_RECORD;
+  if(curVol === 0) return { status: null, prevMax: maxVol, lastReps, isFirstEx: !hasPrevEx, isFirstWeight: !hasPrevWeight };
+
+  if(!hasPrevEx) return { status: STATUS.NEW_EX, prevMax: 0, lastReps:null };
+  if(!hasPrevWeight) return { status: STATUS.NEW_WEIGHT, prevMax: 0, lastReps:null };
+  return {
+    status: (curVol > maxVol) ? STATUS.RECORD : STATUS.NOT_RECORD,
+    prevMax: maxVol,
+    lastReps
+  };
 }
 
-let activeCell = null;
+function renderTable(){
+  const workouts = sortWorkoutsDesc(state.workouts);
+  if(!workouts.length){
+    tableWrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Нет тренировок. Нажми "+ тренировка"</div>`;
+    return;
+  }
+
+  let h = `<table><thead><tr><th class="stickyLeft corner">Блоки / Даты</th>`;
+  workouts.forEach(w => {
+    const dObj = parseDDMMYYYY(w.date);
+    const label = dObj ? fmtDate(dObj).split('.').slice(0,2).join('.') : w.date;
+    h += `<th data-id="${w.id}">
+      <div class="dateHead">
+        <span class="d">${label}</span>
+        <button class="trash" onclick="event.stopPropagation(); deleteWorkout('${w.id}')">✕</button>
+      </div>
+    </th>`;
+  });
+  h += `</tr></thead><tbody>`;
+
+  state.blocks.forEach(block => {
+    h += `<tr class="blockRow" data-block-id="${block.id}">
+      <td class="stickyLeft" colspan="${workouts.length + 1}" style="cursor:pointer">
+        <div class="leftCell">
+          <span class="tinyIcon">${block.collapsed ? '▶' : '▼'}</span>
+          <span class="leftText">${block.name}</span>
+        </div>
+      </td>
+    </tr>`;
+
+    if(!block.collapsed){
+      block.exercises.filter(ex => !ex.archived).forEach(ex => {
+        h += `<tr class="exRow">
+          <td class="stickyLeft"><div class="leftCell"><span class="leftText">${ex.name}</span></div></td>
+          <td colspan="${workouts.length}"></td>
+        </tr>`;
+
+        ex.weights.filter(w => !w.hidden).forEach(wObj => {
+          h += `<tr class="wRow">
+            <td class="stickyLeft">
+              <div class="leftCell">
+                <span class="leftText">${wObj.label}</span>
+                <span class="sideTag">${ex.splitLR ? 'L/R' : 'set'}</span>
+              </div>
+            </td>`;
+          
+          workouts.forEach((w, idx) => {
+            const info = getCellInfo(w.id, ex.id, wObj.id);
+            const entry = state.entries[w.id]?.[ex.id]?.[wObj.id];
+            
+            let classes = ["cell"];
+            let valText = "";
+            let subText = "";
+
+            const hasSets = ex.splitLR 
+              ? ((entry?.L?.sets?.length || 0) + (entry?.R?.sets?.length || 0) > 0)
+              : (entry?.sets?.length > 0);
+
+            if(!hasSets){
+              classes.push("empty");
+              if(idx === 0 && info.lastReps !== null){
+                valText = `надо ${info.lastReps}`;
+              }
+              if(entry?.planned) {
+                valText += valText ? " ⭐" : "⭐";
+              }
+            } else {
+              if(info.status === STATUS.RECORD) classes.push("border-gold");
+              else if(info.status === STATUS.NEW_WEIGHT) classes.push("border-green");
+              else if(info.status === STATUS.NEW_EX) classes.push("border-yellow");
+              else if(info.status === STATUS.NOT_RECORD) classes.push("gray");
+
+              const isInjury = ex.splitLR ? (entry.L?.injury || entry.R?.injury) : entry.injury;
+              if(isInjury) classes.push("injury");
+
+              if(ex.splitLR){
+                const l = entry.L?.sets || [];
+                const r = entry.R?.sets || [];
+                valText = "Вес";
+                subText = `L:${l.join('-') || '—'} R:${r.join('-') || '—'}`;
+              } else {
+                valText = (entry.sets || []).join('-');
+                subText = "повторы";
+              }
+            }
+
+            h += `<td class="${classes.join(' ')}" onclick="openCellModal('${w.id}','${ex.id}','${wObj.id}')">
+              <div class="val">${valText}</div>
+              <div class="sub">${subText}</div>
+            </td>`;
+          });
+          h += `</tr>`;
+        });
+      });
+    }
+  });
+
+  h += `</tbody></table>`;
+  tableWrap.innerHTML = h;
+
+  // Сворачивание
+  $$(".blockRow").forEach(row => {
+    row.onclick = () => {
+      const bid = row.dataset.blockId;
+      const b = state.blocks.find(x=>x.id===bid);
+      if(b){ b.collapsed = !b.collapsed; saveState(); renderTable(); }
+    };
+  });
+
+  // Long press для статистики
+  $$("thead th[data-id]").forEach(th => {
+    let timer;
+    const wId = th.dataset.id;
+    const start = () => { timer = setTimeout(()=> showWorkoutStats(wId), 700); };
+    const stop = () => clearTimeout(timer);
+    th.ontouchstart = start; th.ontouchend = stop;
+    th.onmousedown = start; th.onmouseup = stop; th.onmouseleave = stop;
+  });
+}
+
+function showWorkoutStats(wId){
+  const w = state.workouts.find(x=>x.id===wId);
+  if(!w) return;
+  const entries = state.entries[wId] || {};
+  let records = 0, volume = 0, injuries = 0;
+  
+  for(const exId in entries){
+    const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
+    if(!ex) continue;
+    for(const wghtId in entries[exId]){
+      const info = getCellInfo(wId, exId, wghtId);
+      if(info.status === STATUS.RECORD) records++;
+      const ent = entries[exId][wghtId];
+      if(ex.splitLR){
+        volume += (ent.L?.sets || []).reduce((a,b)=>a+b,0);
+        volume += (ent.R?.sets || []).reduce((a,b)=>a+b,0);
+        if(ent.L?.injury || ent.R?.injury) injuries++;
+      } else {
+        volume += (ent.sets || []).reduce((a,b)=>a+b,0);
+        if(ent.injury) injuries++;
+      }
+    }
+  }
+  showInfo(`Тренировка ${w.date}`, `
+    <div style="display:flex; flex-direction:column; gap:8px">
+      <div class="kpi"><b>${records}</b><small>Рекордов</small></div>
+      <div class="kpi"><b>${volume}</b><small>Суммарных повторов</small></div>
+      <div class="kpi"><b>${injuries}</b><small>Травм отмечено</small></div>
+    </div>
+  `);
+}
+
+function deleteWorkout(id){
+  if(!confirm("Удалить эту тренировку и всю её историю из таблицы?")) return;
+  state.workouts = state.workouts.filter(w => w.id !== id);
+  delete state.entries[id];
+  saveState(); renderTable();
+}
+
+/* ===========================
+   Модалка ячейки
+=========================== */
+let activeCell = null; // {wId, exId, weightId}
+
 function openCellModal(wId, exId, weightId){
-  activeCell = { wId, exId, weightId };
-  const workout = state.workouts.find(w=>w.id===wId);
+  activeCell = {wId, exId, weightId};
+  const workout = state.workouts.find(x=>x.id===wId);
   const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-  const wObj = ex.weights.find(w=>w.id===weightId);
-  const entry = state.entries[wId]?.[exId]?.[weightId] || {};
+  const wght = ex.weights.find(w=>w.id===weightId);
+  const entry = state.entries[wId]?.[exId]?.[weightId];
 
   $("#cellTitle").textContent = ex.name;
-  $("#cellSubtitle").textContent = `${workout.date} • Вес: ${wObj.label}`;
+  $("#cellSubtitle").textContent = `${workout.date} • вес ${wght.label}`;
   
-  const setsWrap = $("#setsWrap");
-  setsWrap.innerHTML = "";
+  const wrap = $("#setsWrap");
+  wrap.innerHTML = "";
 
-  const renderSide = (sideKey, label) => {
-    const data = ex.splitLR ? (entry[sideKey] || {sets:[], injury:false}) : entry;
-    const sideDiv = document.createElement("div");
-    sideDiv.innerHTML = `<h4 style="margin:10px 0 5px">${label}</h4>`;
+  const createSetRow = (val) => {
+    const div = document.createElement("div");
+    div.className = "setRow";
+    div.innerHTML = `<input type="number" value="${val??''}" placeholder="повторы" inputmode="numeric"><button class="btn icon">✕</button>`;
+    div.querySelector("button").onclick = () => div.remove();
+    return div;
+  };
+
+  const addSide = (title, sets) => {
+    const h4 = document.createElement("h4");
+    h4.style.margin = "10px 0 6px 0"; h4.style.fontSize = "12px";
+    h4.textContent = title;
+    wrap.appendChild(h4);
     const container = document.createElement("div");
-    container.className = "sets-container";
+    container.className = "side-container";
+    wrap.appendChild(container);
     
-    const sets = data.sets || [];
-    sets.forEach((s, i) => {
-      const row = document.createElement("div");
-      row.className = "setRow";
-      row.innerHTML = `<input type="number" value="${s}" placeholder="Повторы"><button class="btn" onclick="this.parentElement.remove()">✕</button>`;
-      container.appendChild(row);
-    });
-    sideDiv.appendChild(container);
-    
-    const btn = document.createElement("button");
-    btn.className = "btn"; btn.textContent = "+ сет";
-    btn.onclick = () => {
-      const row = document.createElement("div");
-      row.className = "setRow";
-      row.innerHTML = `<input type="number" placeholder="Повторы"><button class="btn" onclick="this.parentElement.remove()">✕</button>`;
-      container.appendChild(row);
-    };
-    sideDiv.appendChild(btn);
-    setsWrap.appendChild(sideDiv);
+    // Если сетов нет, добавляем один пустой сразу
+    if(!sets || sets.length === 0){
+      container.appendChild(createSetRow(""));
+    } else {
+      sets.forEach(s => container.appendChild(createSetRow(s)));
+    }
   };
 
   if(ex.splitLR){
-    renderSide("L", "Левая (L)");
-    renderSide("R", "Правая (R)");
+    addSide("Левая (L)", entry?.L?.sets);
+    addSide("Правая (R)", entry?.R?.sets);
   } else {
-    renderSide(null, "Сеты");
+    addSide("Сеты", entry?.sets);
   }
 
-  const planned = !!entry.planned;
-  $("#btnTogglePlanned").textContent = planned ? "Вкл" : "Выкл";
-  $("#btnTogglePlanned").onclick = () => {
-    const isNow = $("#btnTogglePlanned").textContent === "Вкл";
-    $("#btnTogglePlanned").textContent = isNow ? "Выкл" : "Вкл";
-  };
-
-  const isInjury = ex.splitLR ? (entry.L?.injury || entry.R?.injury) : entry.injury;
+  const isInjury = ex.splitLR ? (entry?.L?.injury || entry?.R?.injury) : entry?.injury;
   $("#btnToggleInjury").textContent = isInjury ? "Вкл" : "Выкл";
   $("#btnToggleInjury").onclick = () => {
-    const isNow = $("#btnToggleInjury").textContent === "Вкл";
-    $("#btnToggleInjury").textContent = isNow ? "Выкл" : "Вкл";
+    const now = $("#btnToggleInjury").textContent === "Вкл";
+    $("#btnToggleInjury").textContent = now ? "Выкл" : "Вкл";
+  };
+
+  // ПЛАН (ЗВЕЗДА)
+  const isPlanned = !!entry?.planned;
+  $("#btnTogglePlanned").textContent = isPlanned ? "Вкл" : "Выкл";
+  $("#btnTogglePlanned").onclick = () => {
+    const now = $("#btnTogglePlanned").textContent === "Вкл";
+    $("#btnTogglePlanned").textContent = now ? "Выкл" : "Вкл";
   };
 
   cellModalOverlay.classList.add("show");
+  cellModalOverlay.setAttribute("aria-hidden","false");
 }
 
-$("#btnSaveCell").onclick = () => {
-  const { wId, exId, weightId } = activeCell;
-  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
-  const entry = state.entries[wId]?.[exId]?.[weightId] || {};
-  
-  const isInjury = $("#btnToggleInjury").textContent === "Вкл";
-  const isPlanned = $("#btnTogglePlanned").textContent === "Вкл";
-
-  if(ex.splitLR){
-    const containers = $$(".sets-container");
-    const getSets = (c) => $$( "input", c).map(i => clampInt(i.value)).filter(v=>v!==null);
-    entry.L = { sets: getSets(containers[0]), injury: isInjury };
-    entry.R = { sets: getSets(containers[1]), injury: isInjury };
-  } else {
-    const container = $(".sets-container");
-    entry.sets = $$( "input", container).map(i => clampInt(i.value)).filter(v=>v!==null);
-    entry.injury = isInjury;
-  }
-  
-  entry.planned = isPlanned;
-
-  if(!state.entries[wId]) state.entries[wId] = {};
-  if(!state.entries[wId][exId]) state.entries[wId][exId] = {};
-  state.entries[wId][exId][weightId] = entry;
-
-  saveState();
-  renderAll();
-  closeCellModal();
+$("#btnAddSet").onclick = () => {
+  $$(".side-container").forEach(c => {
+    const row = document.createElement("div");
+    row.className = "setRow";
+    row.innerHTML = `<input type="number" placeholder="повторы" inputmode="numeric"><button class="btn icon">✕</button>`;
+    row.querySelector("button").onclick = () => row.remove();
+    c.appendChild(row);
+    row.querySelector("input").focus();
+  });
+};
+$("#btnClearSets").onclick = () => {
+  $$(".setRow").forEach(r => r.remove());
 };
 
-function closeCellModal(){ cellModalOverlay.classList.remove("show"); }
+function closeCellModal(){
+  cellModalOverlay.classList.remove("show");
+  cellModalOverlay.setAttribute("aria-hidden","true");
+  activeCell = null;
+}
 $("#btnCloseCellModal").onclick = closeCellModal;
 $("#btnCancelCell").onclick = closeCellModal;
 
-$("#btnAddWorkout").onclick = () => {
-  const dateStr = prompt("Дата (ДД.ММ.ГГГГ):", fmtDate(new Date()));
-  if(!dateStr || !parseDDMMYYYY(dateStr)) return;
-  state.workouts.push({ id: nowId(), date: dateStr });
-  state.workouts = sortWorkoutsAsc(state.workouts);
-  saveState();
-  renderAll();
+$("#btnSaveCell").onclick = () => {
+  if(!activeCell) return;
+  const {wId, exId, weightId} = activeCell;
+  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
+  
+  const isInjury = $("#btnToggleInjury").textContent === "Вкл";
+  const isPlanned = $("#btnTogglePlanned").textContent === "Вкл";
+  
+  const containers = $$(".side-container");
+  const getSets = (c) => $$( "input", c).map(i => clampInt(i.value)).filter(v=>v!==null);
+
+  if(!state.entries[wId]) state.entries[wId] = {};
+  if(!state.entries[wId][exId]) state.entries[wId][exId] = {};
+
+  if(ex.splitLR){
+    state.entries[wId][exId][weightId] = {
+      L: { sets: getSets(containers[0]), injury: isInjury },
+      R: { sets: getSets(containers[1]), injury: isInjury },
+      planned: isPlanned
+    };
+  } else {
+    state.entries[wId][exId][weightId] = {
+      sets: getSets(containers[0]),
+      injury: isInjury,
+      planned: isPlanned
+    };
+  }
+  
+  saveState(); renderTable(); closeCellModal();
 };
 
-function deleteWorkout(id){
-  if(!confirm("Удалить тренировку?")) return;
-  state.workouts = state.workouts.filter(w => w.id !== id);
-  delete state.entries[id];
-  saveState();
-  renderAll();
-}
-
+/* ===========================
+   Управление (Drawer)
+=========================== */
 function refreshMenuSelects(){
   const bSel = $("#selBlockAddEx");
   bSel.innerHTML = state.blocks.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
@@ -1001,18 +1244,48 @@ function refreshMenuSelects(){
   const exs = state.blocks.flatMap(b=>b.exercises);
   const opts = exs.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
   eSel1.innerHTML = opts; eSel2.innerHTML = opts;
+  refreshWeightsManage();
 }
+
+function refreshWeightsManage(){
+  const eId = $("#selManageExercise").value;
+  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
+  const list = $("#weightsList");
+  if(!ex){ list.innerHTML = ""; return; }
+  list.innerHTML = ex.weights.map(w => `
+    <div class="toggleLine" style="margin-top:4px; padding:6px 10px">
+      <span style="font-weight:600">${w.label}</span>
+      <div class="rowActions">
+        <button class="btn" onclick="toggleWeightHidden('${ex.id}','${w.id}')">${w.hidden?'Показать':'Скрыть'}</button>
+      </div>
+    </div>
+  `).join('');
+}
+$("#selManageExercise").onchange = refreshWeightsManage;
+
+window.toggleWeightHidden = (exId, wId) => {
+  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
+  const w = ex.weights.find(x=>x.id===wId);
+  if(w){ w.hidden = !w.hidden; saveState(); refreshWeightsManage(); renderTable(); }
+};
+
+$("#btnAddWorkout").onclick = () => {
+  const d = prompt("Дата новой тренировки (ДД.ММ.ГГГГ):", fmtDate(new Date()));
+  if(!d) return;
+  if(!parseDDMMYYYY(d)){ alert("Неверный формат даты"); return; }
+  state.workouts.push({ id: nowId(), date: d });
+  state.workouts = sortWorkoutsAsc(state.workouts);
+  saveState(); renderTable();
+};
 
 $("#btnAddExercise").onclick = () => {
   const bId = $("#selBlockAddEx").value;
   const name = $("#inExName").value.trim();
   if(!name) return;
-  const block = state.blocks.find(b=>b.id===bId);
-  block.exercises.push({ id: nowId(), name, weights: [], archived: false, splitLR: false });
+  const b = state.blocks.find(x=>x.id===bId);
+  b.exercises.push({ id: nowId(), name, archived:false, splitLR:false, weights:[] });
   $("#inExName").value = "";
-  saveState();
-  closeDrawer();
-  renderAll();
+  saveState(); refreshMenuSelects(); renderTable();
 };
 
 $("#btnAddWeight").onclick = () => {
@@ -1020,19 +1293,168 @@ $("#btnAddWeight").onclick = () => {
   const label = $("#inWeightLabel").value.trim();
   if(!label) return;
   const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
-  ex.weights.push({ id: nowId(), label, hidden: false });
+  ex.weights.push({ id: nowId(), label, hidden:false });
   ex.weights.sort((a,b)=> weightMaxNumber(a.label)-weightMaxNumber(b.label));
   $("#inWeightLabel").value = "";
-  saveState();
-  closeDrawer();
-  renderAll();
+  saveState(); refreshMenuSelects(); renderTable();
+};
+
+$("#btnToggleSplit").onclick = () => {
+  const eId = $("#selManageExercise").value;
+  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
+  if(ex){ ex.splitLR = !ex.splitLR; saveState(); renderTable(); }
+};
+$("#btnToggleArchive").onclick = () => {
+  const eId = $("#selManageExercise").value;
+  const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===eId);
+  if(ex){ ex.archived = !ex.archived; saveState(); renderTable(); refreshMenuSelects(); }
+};
+$("#btnDeleteExercise").onclick = () => {
+  const eId = $("#selManageExercise").value;
+  if(!confirm("Удалить упражнение НАВСЕГДА вместе со всей историей?")) return;
+  for(const b of state.blocks){
+    const idx = b.exercises.findIndex(x=>x.id===eId);
+    if(idx!==-1){
+      b.exercises.splice(idx,1);
+      for(const wId in state.entries){ delete state.entries[wId][eId]; }
+      break;
+    }
+  }
+  saveState(); renderTable(); refreshMenuSelects();
 };
 
 $("#btnReset").onclick = () => {
-  if(confirm("Сбросить всё?")) { state = seedState(); saveState(); location.reload(); }
+  if(confirm("Сбросить все данные и загрузить пример?")){
+    state = seedState(); saveState(); location.reload();
+  }
 };
 
-renderAll();
+$("#btnExport").onclick = () => {
+  const json = JSON.stringify(state, null, 2);
+  showInfo("Экспорт JSON", `<textarea id="exportArea" style="width:100%;height:200px;font-size:10px">${json}</textarea>
+    <button class="btn primary" style="margin-top:10px" onclick="copyExp()">Копировать</button>`);
+};
+window.copyExp = () => { const a=$("#exportArea"); a.select(); document.execCommand("copy"); };
+
+$("#btnImport").onclick = () => {
+  showInfo("Импорт JSON", `<textarea id="importArea" style="width:100%;height:200px;font-size:10px" placeholder="Вставь JSON сюда..."></textarea>
+    <button class="btn danger" style="margin-top:10px" onclick="doImp()">Загрузить</button>`);
+};
+window.doImp = () => {
+  try {
+    const obj = JSON.parse($("#importArea").value);
+    localStorage.setItem(LS_KEY, JSON.stringify(obj));
+    location.reload();
+  } catch(e){ alert("Ошибка в JSON"); }
+};
+
+/* ===========================
+   Аналитика
+=========================== */
+function renderAnalytics(){
+  const blocks = state.blocks;
+  anBlock.innerHTML = `<option value="ALL">Все блоки</option>` + blocks.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  
+  const updateExs = () => {
+    const bId = anBlock.value;
+    const exs = (bId==="ALL") ? blocks.flatMap(b=>b.exercises) : blocks.find(b=>b.id===bId).exercises;
+    anExercise.innerHTML = `<option value="ALL">Все упр-я</option>` + exs.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+    drawChart();
+  };
+  anBlock.onchange = updateExs;
+  anExercise.onchange = drawChart;
+  anMetric.onchange = drawChart;
+  updateExs();
+}
+
+function drawChart(){
+  const bId = anBlock.value;
+  const eId = anExercise.value;
+  const metric = anMetric.value;
+  const workouts = sortWorkoutsAsc(state.workouts);
+  
+  const data = workouts.map(w => {
+    let val = 0;
+    const entries = state.entries[w.id] || {};
+    
+    const countMetric = (exId, weightId, entry) => {
+      const ex = state.blocks.flatMap(b=>b.exercises).find(e=>e.id===exId);
+      if(!ex) return 0;
+      if(metric==="volume"){
+        if(ex.splitLR){
+          return ((entry.L?.sets || []).reduce((a,b)=>a+b,0) + (entry.R?.sets || []).reduce((a,b)=>a+b,0));
+        }
+        return (entry.sets || []).reduce((a,b)=>a+b,0);
+      }
+      if(metric==="reps"){
+        if(ex.splitLR) return (entry.L?.sets?.length||0) + (entry.R?.sets?.length||0);
+        return entry.sets?.length || 0;
+      }
+      if(metric==="records"){
+        return getCellInfo(w.id, exId, weightId).status === STATUS.RECORD ? 1 : 0;
+      }
+      if(metric==="injuries"){
+        if(ex.splitLR) return (entry.L?.injury || entry.R?.injury) ? 1 : 0;
+        return entry.injury ? 1 : 0;
+      }
+      return 0;
+    };
+
+    if(eId !== "ALL"){
+      for(const wghtId in entries[eId]||{}) val += countMetric(eId, wghtId, entries[eId][wghtId]);
+    } else if(bId !== "ALL"){
+      const bExs = state.blocks.find(b=>b.id===bId).exercises;
+      bExs.forEach(ex => {
+        for(const wghtId in entries[ex.id]||{}) val += countMetric(ex.id, wghtId, entries[ex.id][wghtId]);
+      });
+    } else {
+      for(const exKey in entries){
+        for(const wghtId in entries[exKey]){
+          val += countMetric(exKey, wghtId, entries[exKey][wghtId]);
+        }
+      }
+    }
+    return val;
+  });
+
+  const ctx = chart.getContext("2d");
+  ctx.clearRect(0,0,chart.width,chart.height);
+  const max = Math.max(...data, 10);
+  const pad = 40;
+  const w = chart.width - pad*2;
+  const h = chart.height - pad*2;
+  const stepX = w / (data.length-1 || 1);
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--line');
+  ctx.beginPath();
+  for(let i=0; i<=5; i++){
+    const y = pad + h - (i/5)*h;
+    ctx.moveTo(pad, y); ctx.lineTo(pad+w, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  data.forEach((v,i) => {
+    const x = pad + i*stepX;
+    const y = pad + h - (v/max)*h;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // KPIs
+  const total = data.reduce((a,b)=>a+b,0);
+  const avg = (total/data.length).toFixed(1);
+  kpiRow.innerHTML = `
+    <div class="kpi"><b>${total}</b><small>Всего за период</small></div>
+    <div class="kpi"><b>${avg}</b><small>Среднее</small></div>
+    <div class="kpi"><b>${Math.max(...data)}</b><small>Пик</small></div>
+  `;
+}
+
+// Start
+renderTable();
 </script>
 </body>
 </html>
